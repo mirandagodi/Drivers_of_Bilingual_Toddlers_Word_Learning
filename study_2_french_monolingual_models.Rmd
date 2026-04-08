@@ -1,0 +1,396 @@
+---
+title: "English monolingual accumulator models: CHILDES + CDI parameters"
+author: "Miranda Gomez Diaz"
+date: "2025-05-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Load packages}
+# # Install packages
+# install.packages(c("tidyverse", "lme4", "wordbankr", "ggpubr", "purrr", "psych", "beepr", "devtools"))
+# # Install Wordbankr
+# devtools::install_github("langcog/wordbankr")
+
+# Load libraries
+library(tidyverse)
+# library(childes-db)
+# library(childesr)
+library(wordbankr)
+library(lme4)
+library(ggpubr)
+# library(purrr)
+# library(psych)
+library(beepr)
+library(jtools)
+library(report)
+library(gtsummary)
+library(performance)
+```
+
+```{r Load files}
+# Read translation equivalents data
+TE_list <- read_csv("data/ws_te_list_full.csv") %>%
+  # remove unnecessary columns
+  select(-c(word_en, word_fr, one_to_many)) %>%
+  rename(eng_item_num = en_item_num)
+```
+
+Estimate the number of tokens French-learning children hear per month. Estimates were retrieved from Le Normand & Thai-Van (2022). Table 1 includes the number of children in each age group and the group mean of word tokens heard in a session, which were 20 minutes long
+```{r}
+# Estimate the weighted mean of tokens per session
+group_means <- c(127, 199, 256, 392, 414, 486, 494, 491, 475)
+group_sizes <- c(39, 32, 38, 36, 37, 34, 33, 35, 31)
+
+mean_tokens_per_session <-  weighted.mean(group_means, group_sizes)
+
+# Estimate tokens per month
+mean_tokens_per_month <- round(mean_tokens_per_session * 3 * # Tokens per hour, given that sessions were ~20 minutes long
+                                                  12 * # Tokens per day, assuming each child hears 12 hrs of child-directed speech per day
+                                                  30.44, # Token per month, with 30.44 days in an average month
+                              digits = 0)
+```
+The number of monthly tokens heard by French-acquiring children is not very different from the monthly tokens for English-acquiring children (438336). And given that our sample is North American, the English tokens will be used for French models.
+
+Retrieve French data from CHILDES
+```{r Read CHILDES data}
+## Retrieve data from Braginsky et al (2019)
+load("data/uni_joined.Rdata") # This data frame includes all words in all languages. Includes word frequency measures from CHILDES
+
+# Estimate tokens per month in French
+# 183 nouns
+fre_tokens_per_month <- uni_joined %>% 
+  filter(language == "French (Quebec)", # Keep only French Tokens
+         measure == "produces") %>% # Keep word production data only, as comprehension was included
+  select(uni_lemma, lexical_classes, words, word_count) %>% 
+  rename(fre_item = words,
+         lexical_class = lexical_classes) %>% 
+  group_by(fre_item) %>% 
+  filter(row_number() == 1, # Keep only one row per type
+         !is.na(word_count)) %>% # Remove types that do not have word count (they were not on CHILDES?)
+  ungroup() %>% 
+  # The following line are based on Kachergis_etal_2022/get_childes_freqs
+  mutate(prob = word_count / sum(word_count), # Estimate the probability that a word is heard
+         tok_per_mo = prob * 438336, # Multiply the probability of each word times the number of tokens a child hears on average in a month. This is the same number of monthly tokens used for English
+         lexical_class = case_when(str_detect(lexical_class, "nouns") ~ "nouns",
+                                   TRUE ~ lexical_class), # Set lexical class to "nouns" those cells that contain "nouns", even if they also include other lexical class
+         # Change the spelling of some items so they match the spelling from Wordbank
+         fre_item = case_when(fre_item == "divan" ~ "divan/sofa",
+                              fre_item == "nouilles/pâtes, spaghetti" ~ "nouilles/pâtes",
+                              fre_item == "ourson/nounours, toutou" ~ "ourson/nounours",
+                              fre_item == "toast/rôtie" ~ "toast",
+                              fre_item == "pantalon" ~ "pantalons",
+                              fre_item == "brosse à dent" ~ "brosse à dents",
+                              fre_item == "parc (d´enfant)" ~ "parc (d'enfant)",
+                              TRUE ~ fre_item)
+  )
+
+save(fre_tokens_per_month, file = "data/fre_tokens_per_month.RDS")
+```
+
+```{r Compare French and English corpora}
+# Get original CHILDES files used by Braginsky (childes_english is the same as Kachergis)
+eng_childes_df <- read_csv("data/childes_english.csv")
+fre_childes_df <-  read_csv("data/childes_french.csv")
+# load("data/childes_sizes.RData")
+
+
+fre_total_tokens <- sum(fre_childes_df$word_count, na.rm = TRUE)
+
+eng_total_tokens <- sum(eng_childes_df$word_count, na.rm = TRUE)
+```
+
+```{r French Wordbank data}
+# Get item info
+# 307 nouns
+fre_ws_items <- get_item_data("French (Quebecois)", "WS") %>%
+  select(item_id, item_definition, uni_lemma, lexical_category) %>% 
+  rename(fre_item = item_definition) %>% 
+  filter(!is.na(lexical_category)) %>% # Keep only rows for single items, not questions about past tense, plurals, etc.
+  mutate(fr_item_num = as.numeric(sub(".*_", "", item_id)))
+ 
+# Get English items info. This will be used to merge French Wordbank data with the eng_tokens_per_month dataset.
+eng_items <- get_item_data("English (American)", "WS") %>%
+  select(item_id, item_definition, uni_lemma, lexical_category) %>%
+  rename(eng_item = item_definition
+         ) %>%
+  filter(!is.na(lexical_category)) %>%  # Keep only rows for single items, not questions about past tense, plurals, etc.
+  select(-lexical_category) %>% 
+  mutate(eng_item_num = as.numeric(sub(".*_", "", item_id))) %>% 
+ # Append translation equivalents (TE) list to data
+  left_join(TE_list, by = "eng_item_num") %>% 
+  select(eng_item, fr_item_num) %>% 
+  filter(!is.na(fr_item_num))
+
+# # Join French and English items
+fre_ws_items <- left_join(fre_ws_items, eng_items, by = "fr_item_num") %>% 
+  group_by(lexical_category)
+
+# Get administration data
+fre_ws_data <- get_instrument_data(language = "French (Quebecois)",
+                                   form = "WS",
+                                   # items = c("item_1", "item_42"),
+                                   administration_info = TRUE)
+```
+
+```{r Merge Wordbank datasets}
+load("data/eng_tokens_per_month.RDS")
+# Merge item and administration data, and word frequency data
+fre_cdi_data <- left_join(fre_ws_items, fre_ws_data, by = "item_id") %>% 
+  mutate(produces = case_when(produces == TRUE ~ 1,
+                              produces == FALSE ~ 0),
+         person = as.factor(child_id)) %>% 
+  # MERGE WITH WORD FREQUENCY DATA. CHOOSE FRENCH OR ENGLISH
+  # right_join(fre_tokens_per_month, by = "fre_item") %>%  # Merge with French word frequency data. Right join so only items with word frequency data are kept
+  right_join(eng_tokens_per_month, by = c("eng_item" = "item")) %>% # Merge with English word frequency data. Right join so only items with word frequency data are kept
+  
+  # rename(lexical_class = lexical_category) %>% 
+  select(person, produces, age, production, fre_item, uni_lemma:tok_per_mo)
+
+# 296 nouns when merged with English word frequency. 183 nouns when merged with French word frequency.
+summary_fre_lexical_class <- fre_cdi_data %>% 
+  group_by(fre_item) %>% 
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+  group_by(lexical_class) %>% 
+  summarise(N_items = n())
+```
+
+```{r Identify homophones}
+# Identify homophones
+# 9 nouns that are homophones
+fre_cdi_homophones_df <- fre_tokens_per_month %>% 
+  mutate(possible_homophone = case_when(str_detect(uni_lemma, "[(]") ~ "yes", # Identify items that may be homophones if they have parentheses either in English or French.
+                                        str_detect(fre_item, "[(]") ~ "yes",
+                                        str_detect(fre_item, "parc") ~ "yes")) %>% 
+  # Keep rows where the item (in English) has parentheses, which specify the meaning of the word. Some words are the same in English (e.g., brush) but slightly different in French (e.g., brosse and brosser), therefore they don't have parentheses in French, but still have the same word frequency. These words will be considered homophones.
+  filter(possible_homophone == "yes") %>% # Keep only potential homophones
+  arrange(uni_lemma) %>%
+  group_by(tok_per_mo) %>% # Group word pairs with the same frequency
+  mutate(is_homophone = case_when(row_number() > 1 ~ "yes",
+                                  lead(row_number()) > 1 ~ "yes",
+         TRUE ~ "no")) %>% 
+  filter(is_homophone == "yes")
+
+save(fre_cdi_homophones_df, file = "data/fre_cdi_homophones_df.RDS")
+
+# Remove homophones
+without_homophones_fre_cdi_data <- fre_cdi_data %>%
+  filter(! (fre_item %in% fre_cdi_homophones_df$fre_item))
+```
+
+```{r Correlate English-French word frequencies}
+load("data/eng_tokens_per_month.RDS")
+load("data/fre_tokens_per_month.RDS")
+
+eng_fre_tokens_per_month <- full_join(eng_tokens_per_month, fre_tokens_per_month, # Merge Eng and Fre word frequency data sets
+                                      join_by(item == uni_lemma),
+                                      suffix = c("_eng", "_fre")) %>% 
+  filter((lexical_class_eng == "nouns" | lexical_class_fre == "nouns"),
+         !is.na(tok_per_mo_fre),
+         !is.na(tok_per_mo_eng)#,
+         # tok_per_mo_fre < 1000
+  )
+
+# Correlation with homophones (174 nouns)
+cor_word_freq <- cor(eng_fre_tokens_per_month$tok_per_mo_eng, eng_fre_tokens_per_month$tok_per_mo_fre)
+
+ggscatter(eng_fre_tokens_per_month, x = "tok_per_mo_eng", y = "tok_per_mo_fre", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "English word frequency", ylab = "French word frequency")
+
+# Remove homophones
+load("data/fre_cdi_homophones_df.RDS")
+load("data/eng_cdi_homophones_df.RDS")
+
+eng_fre_tokens_per_month_nonhomophones <- eng_fre_tokens_per_month %>% 
+  filter(! (fre_item %in% fre_cdi_homophones_df$fre_item),
+         ! (item %in% eng_cdi_homophones_df$item))
+
+# Correlation without homophones (160 nouns)
+cor_word_freq_nonhomophones <- cor(eng_fre_tokens_per_month_nonhomophones$tok_per_mo_eng, eng_fre_tokens_per_month_nonhomophones$tok_per_mo_fre)
+
+ggscatter(eng_fre_tokens_per_month_nonhomophones, x = "tok_per_mo_eng", y = "tok_per_mo_fre", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "English word frequency", ylab = "French word frequency")
+```
+
+```{r Keep nouns only}
+# Remove non-nouns
+# 287 nouns
+nouns_only_fre_cdi_data <- without_homophones_fre_cdi_data %>% 
+  filter(lexical_class == "nouns")
+
+# Keep only word frequency for each item, not each child
+unique_nouns_only_fre_cdi_data <- nouns_only_fre_cdi_data %>% 
+  group_by(fre_item) %>% 
+  filter(row_number() == 1) %>% # Keep one row per item
+  select(fre_item, lexical_class, tok_per_mo)
+
+hist(unique_nouns_only_fre_cdi_data$tok_per_mo)
+
+# Estimate average noun frequency to center tokens per month
+mean_fre_noun_frequency <- mean(unique_nouns_only_fre_cdi_data$tok_per_mo) # 57.392
+
+# Center age and tokens per month
+mono_fre_nouns_only_cdi_data <- nouns_only_fre_cdi_data %>% 
+  # Center variables
+  mutate(age_centered = age - 24,
+         tok_per_mo_centered = tok_per_mo - mean_fre_noun_frequency,
+         frequency_bins = case_when(tok_per_mo <= 100 ~ "0-100",
+                                    tok_per_mo > 100 & tok_per_mo <= 200 ~ "101-200",
+                                    tok_per_mo > 200 & tok_per_mo <= 300 ~ "201-300",
+                                    # tok_per_mo > 300 & tok_per_mo <= 400 ~ "301-400",
+                                    # tok_per_mo > 400 & tok_per_mo <= 500 ~ "401-500",
+                                    # tok_per_mo > 500 ~ "501-600"
+                                    tok_per_mo > 300 ~ "301+"), # There is only one item (book) with frequency greater than 400, therefore it is grouped with the 401-500 bin
+         lifetime_tokens = tok_per_mo * age
+         ) %>% 
+  filter(!is.na(child_id))
+
+save(mono_fre_nouns_only_cdi_data, file = "data/mono_fre_nouns_only_cdi_data.RDS")
+
+# Sample descriptives
+mono_fre_sample_summ <- mono_fre_nouns_only_cdi_data %>% 
+  group_by(child_id) %>%
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+  summarise(N_child = n(),
+            mean_age = round(mean(age), digits = 2),
+            sd_age = round(sd(age), digits = 2))
+
+mono_fre_item_summ <- mono_fre_nouns_only_cdi_data %>% 
+  group_by(fre_item) %>%
+  filter(row_number() == 1) 
+```
+
+```{r Nouns only models}
+load("data/mono_fre_nouns_only_cdi_data.RDS")
+
+# Run models
+# Lifetime tokens
+m_fre_lifetime_tokens_nouns_only <- 
+  glmer(produces ~ -1 + lifetime_tokens + (1 | fre_item) + (1 | person), 
+                           data = mono_fre_nouns_only_cdi_data,
+                           family = binomial,
+                           nAGQ = 0) # This was done by Kachergis et al.
+beep()
+# Save files, so we don't need to run the models every time
+save(m_fre_lifetime_tokens_nouns_only, file = "models/mono_fre_lifetime_tokens_nouns_only.RDS")
+
+# Additive: age + tokens per month
+m_fre_additive_age_tokmo_nouns_only <- 
+  glmer(produces ~ -1 + age_centered + tok_per_mo_centered + (1 | fre_item) + (1 | person), 
+                           data = mono_fre_nouns_only_cdi_data,
+                           family = binomial,
+                           nAGQ = 0) # This was done by Kachergis et al.
+beep()
+# Save files, so we don't need to run the models every time
+save(m_fre_additive_age_tokmo_nouns_only, file = "models/mono_fre_additive_age_tokmo_nouns_only.RDS")
+
+# Interactive: age * tokens per month
+m_fre_interactive_age_tokmo_nouns_only <- 
+  glmer(produces ~ -1 + age_centered * tok_per_mo_centered + (1 | fre_item) + (1 | person), 
+                           data = mono_fre_nouns_only_cdi_data,
+                           family = binomial,
+                           nAGQ = 0) # This was done by Kachergis et al.
+beep()
+# Save files, so we don't need to run the models every time
+save(m_fre_interactive_age_tokmo_nouns_only, file = "models/mono_fre_interactive_age_tokmo_nouns_only.RDS")
+```
+
+```{r Noun model comparison}
+# Load models
+load("models/mono_fre_lifetime_tokens_nouns_only.RDS")
+load("models/mono_fre_additive_age_tokmo_nouns_only.RDS")
+load("models/mono_fre_interactive_age_tokmo_nouns_only.RDS")
+
+# Compare lifetime tokens vs additive age+tokens per months models
+fre_lifetok_additive_comparison <-  anova(m_fre_lifetime_tokens_nouns_only, m_fre_additive_age_tokmo_nouns_only)
+fre_lifetok_additive_comparison
+
+# Compare lifetime tokens vs interactive age*token per month models
+fre_lifetok_interactive_comparison <- anova(m_fre_lifetime_tokens_nouns_only, m_fre_interactive_age_tokmo_nouns_only)
+fre_lifetok_interactive_comparison
+
+# Compare additive age+tokens per months vs interactive age*token per month models
+fre_additive_interactive_comparison <- anova(m_fre_additive_age_tokmo_nouns_only, m_fre_interactive_age_tokmo_nouns_only)
+fre_additive_interactive_comparison
+
+beep()
+
+# Save model comparisons
+save(fre_lifetok_additive_comparison, fre_lifetok_interactive_comparison, fre_additive_interactive_comparison, file = "models/mono_fre_lifetok_additive_interactive_models_comparison")
+
+```
+
+```{r Standardized model}
+load("data/mono_fre_nouns_only_cdi_data.RDS")
+
+scaled_mono_fre_nouns_only_cdi_data <- mono_fre_nouns_only_cdi_data %>% 
+  mutate(scaled_age_centered = scale(age_centered),
+         scaled_tok_per_mo_centered = scale(tok_per_mo_centered))
+
+# Run model with scaled predictors
+scaled_m_fre_interactive_age_tokmo_nouns_only <- 
+  glmer(produces ~ -1 + scaled_age_centered * scaled_tok_per_mo_centered + (1 | eng_item) + (1 | person), 
+                           data = scaled_mono_fre_nouns_only_cdi_data,
+                           family = binomial,
+                           nAGQ = 0)
+
+save(scaled_m_fre_interactive_age_tokmo_nouns_only, file = "models/scaled_m_fre_interactive_age_tokmo_nouns_only.RDS")
+
+# Get standardized coefficients
+tbl_regression(scaled_m_fre_interactive_age_tokmo_nouns_only)
+```
+
+```{r Interactive model report}
+# Get which main and interaction effects are significant
+
+summary(m_fre_additive_age_tokmo_nouns_only)
+summ(m_fre_additive_age_tokmo_nouns_only, digits = 3)
+# report(m_fre_additive_age_tokmo_nouns_only, digits = 3)
+tbl_regression(m_fre_additive_age_tokmo_nouns_only)
+
+# check_model(m_fre_interactive_age_tokmo_nouns_only)
+# model_performance(m_fre_interactive_age_tokmo_nouns_only)
+summary(m_fre_interactive_age_tokmo_nouns_only)
+summ(m_fre_interactive_age_tokmo_nouns_only, digits = 3)
+# report(m_fre_interactive_age_tokmo_nouns_only, digits = 3)
+tbl_regression(m_fre_interactive_age_tokmo_nouns_only)
+r2(m_fre_interactive_age_tokmo_nouns_only)
+```
+
+```{r Visualize interactive model}
+load("data/mono_fre_nouns_only_cdi_data.RDS")
+# hist(nouns_only_word_frequency$tok_per_mo)
+
+# Visualize age*frequency interaction
+mono_fre_interactive_viz <- ggplot(data = mono_fre_nouns_only_cdi_data, aes(x = age, y = produces, color = frequency_bins)) +
+  # geom_point() +
+  geom_smooth(method = "glm",
+    method.args = list(family = "binomial"),
+    # se = FALSE,
+    alpha = 0.3
+    ) +
+  scale_color_bmj() +
+  ylim(NA,1) +
+  labs(title = "French Monolingual Word Learning",
+       x = "Age (months)",
+       y = "Probability of word production",
+       color = "Monthly concept \nfrequency")
+
+mono_fre_interactive_viz
+
+ggsave("figures/mono_fre_interactive_viz.png", plot = mono_fre_interactive_viz,
+       width = 16,
+       height = 8,
+       units = "cm"
+       )
+```
+
