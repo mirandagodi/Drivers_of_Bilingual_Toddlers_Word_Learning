@@ -253,7 +253,7 @@ r2(m_eng_interactive_age_tokmo_nouns_only)
 # report(m_eng_interactive_age_tokmo_nouns_only, digits = 3)
 ```
 
-```{r Visualize interactive model}
+```{r Visualize monolingual English interactive model}
 load("data/mono_eng_nouns_only_word_frequency.RDS")
 
 mono_eng_nouns_only_word_frequency <- mono_eng_nouns_only_word_frequency %>% 
@@ -281,10 +281,5 @@ mono_eng_interactive_viz <- ggplot(data = mono_eng_nouns_only_word_frequency, ae
 
 mono_eng_interactive_viz
 
-ggsave("figures/mono_eng_interactive_viz.png", plot = mono_eng_interactive_viz,
-       width = 16,
-       height = 8,
-       units = "cm"
-       )
 ```
 

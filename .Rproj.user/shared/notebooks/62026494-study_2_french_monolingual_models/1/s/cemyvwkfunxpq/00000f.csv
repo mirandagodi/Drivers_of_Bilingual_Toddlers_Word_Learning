@@ -1,0 +1,5 @@
+"0","# Arrange two plots into a single image"
+"0","mono_interactive_plots <- ggarrange(mono_eng_interactive_viz, mono_fre_interactive_viz,"
+"0","                                      nrow = 2"
+"0","                                      )"
+"0","mono_interactive_plots"

@@ -29,6 +29,7 @@ library(jtools)
 library(report)
 library(gtsummary)
 library(performance)
+library(ggsci)
 ```
 
 ```{r Load files}
@@ -366,7 +367,38 @@ tbl_regression(m_fre_interactive_age_tokmo_nouns_only)
 r2(m_fre_interactive_age_tokmo_nouns_only)
 ```
 
-```{r Visualize interactive model}
+```{r Visualize monolingual English interactive model}
+# Create monolingual English graph to be combined with the French viz
+load("data/mono_eng_nouns_only_word_frequency.RDS")
+
+mono_eng_nouns_only_word_frequency <- mono_eng_nouns_only_word_frequency %>% 
+  mutate(frequency_bins = case_when(tok_per_mo <= 100 ~ "0-100",
+                                    tok_per_mo > 100 & tok_per_mo <= 200 ~ "101-200",
+                                    tok_per_mo > 200 & tok_per_mo <= 300 ~ "201-300",
+                                    tok_per_mo > 300 ~ "301+"), # There is only one item (book) with frequency greater than 400, therefore it is grouped with the 300+ bin
+         )
+
+
+# Visualize age*frequency interaction
+mono_eng_interactive_viz <- ggplot(data = mono_eng_nouns_only_word_frequency, aes(x = age, y = produces, color = frequency_bins)) +
+  # geom_point() +
+  geom_smooth(method = "glm",
+    method.args = list(family = "binomial"),
+    # se = FALSE,
+    alpha = 0.3
+    ) +
+  scale_color_bmj() +
+  ylim(NA,1) +
+  labs(title = "English Monolingual Word Learning",
+       x = "Age (months)",
+       y = "Probability of word production",
+       color = "Monthly concept \nfrequency")
+
+mono_eng_interactive_viz
+
+```
+
+```{r Visualize monolingual French interactive model}
 load("data/mono_fre_nouns_only_cdi_data.RDS")
 # hist(nouns_only_word_frequency$tok_per_mo)
 
@@ -387,10 +419,18 @@ mono_fre_interactive_viz <- ggplot(data = mono_fre_nouns_only_cdi_data, aes(x = 
 
 mono_fre_interactive_viz
 
-ggsave("figures/mono_fre_interactive_viz.png", plot = mono_fre_interactive_viz,
-       width = 16,
-       height = 8,
-       units = "cm"
-       )
 ```
+
+```{r Combine English and French viz}
+# Arrange two plots into a single image
+mono_interactive_plots <- ggarrange(mono_eng_interactive_viz, mono_fre_interactive_viz,
+                                      nrow = 2
+                                      )
+mono_interactive_plots
+ggsave("figures/mono_interactive_plots.png", plot = mono_interactive_plots,
+       width = 16,
+       height = 15,
+       units = "cm")
+```
+
 
