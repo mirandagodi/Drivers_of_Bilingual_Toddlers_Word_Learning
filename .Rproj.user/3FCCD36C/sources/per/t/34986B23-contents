@@ -1,0 +1,935 @@
+---
+title: 'Study 1: Accumulator Simulations'
+author: "Miranda Gómez Díaz"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Load libraries}
+# Load libraries
+library(tidyverse)
+library(stringi)
+library(beepr)
+library(ggpubr)
+# library(patchwork)
+library(gridExtra)
+```
+
+```{r Color palette}
+my_colors <- c("#0F62CD","#6094FF", "#A391F8","#FBBCBC", "#F96D99", "#D11991", "#DB1D00","#E56B00","#EDB100","#1D8E6C")
+```
+
+#Simulation 0: word difficulty
+
+This simulation replicated the study by McMurray (2007). It assumes that 1) at each time point each word gains one experience unit, 2) words' difficulty (i.e., the instances needed to be learned) follow a Gaussian distribution. Following McMurray (2007), 10,000 (pseudo)words with varying levels of difficulty (M = 4,000, SD = 600) were simulated. Vocabulary size and new words are plotted across 6,000 time points. This simulation is equivalent to the vocabulary growth of a monolingual child in their only language.
+```{r Code for S0}
+# This chunk is from the first_tries Rmd, with a few adjustments to some values to follow more closely what McMurray (2007) did.
+
+vocabsize_by_time_df0 <- setNames(data.frame(matrix(ncol = 3, nrow = 0)), c("time_point", "vocabulary_size", "new_words")) # Create an empty df to fill with the time that has passed, the vocabulary size, and number of new words learned at each time point
+
+
+time_range <- 0:6000 # 6,000 is around the upper end in McMurray's paper
+vocabulary_size <-  0 # Create a variable to be used in the loop
+previous_vocabulary_size <- 0 # Create a variable to be used in the loop
+
+set.seed(11) # Setting the seed to get the same results every time, as rpois() generates random numbers
+word_difficulty_df <- data.frame(words <- stri_rand_strings(10000, 5), # Generate 10,000 random pseudo-words with 5 characters each
+                                 # difficulty <- rpois(n = 10000, lambda = 4000))  # Using rpois() for a poisson distribution (i.e., having discrete counts; you can't need 23.2 times of hearing the word to learn it).
+                                 difficulty <- rnorm(n = 10000, mean = 4000, sd = 600)) # Using rnorm() to get a smoother curve; it produces continuous values. 
+  colnames(word_difficulty_df) <- c("words", "difficulty")
+  
+# Visualizations of word difficulty
+hist(word_difficulty_df$difficulty,
+     breaks = 20)
+
+
+for (i in time_range) {
+  time_point <- i # Time elapsed equals each instance of time_range
+  vocabulary_size <- sum(word_difficulty_df$difficulty <= time_point, na.rm=TRUE) # Estimates the total number of words that have accumulated enough experience at the current time point
+  new_words <- vocabulary_size - previous_vocabulary_size # Estimates the number of new words that were learned at the current time point, based on the previous loop's vocabulary size
+  # new_words <- sum(word_difficulty_df$difficulty == time_point | word_difficulty_df$difficulty > (time_point - 1), na.rm=TRUE)
+  row_data <- c(time_point, vocabulary_size, new_words)
+  # print(row_data)
+  vocabsize_by_time_df0[nrow(vocabsize_by_time_df0) + 1,] <- row_data
+  previous_vocabulary_size <- vocabulary_size # This line sets the vocabulary size of the current loop to be used as the "previous" vocabulary size for the next loop
+  # print(i) # This line is to check that the loop is doing what it's supposed to do
+  # print(time_elapsed) # This line is to check that the loop is doing what it's supposed to do
+  # print(vocabulary_size)# This line is to check that the loop is doing what it's supposed to do
+  
+}
+
+save(word_difficulty_df, file = "data/word_difficulty_df.RDS")
+save(vocabsize_by_time_df0, file = "data/vocabsize_by_time_df0.RDS")
+
+```
+
+```{r Viz S1}
+# load("data/word_difficulty_df.RDS")
+# load("data/vocabsize_by_time_df0.RDS")
+# 
+# # Smooth plot of vocabulary size across time
+# sim0_mono <- ggplot(data = vocabsize_by_time_df0, aes(x = time_point, y = vocabulary_size)) +
+#   geom_smooth(color = "#1D8E6C") +
+#   labs(title = "Simulation 0",
+#        x = "Time steps",
+#        y = "Number of words learned"
+#       ) +
+#   scale_color_brewer(palette="Set1")
+#   # theme(text=element_text(size=15))
+# sim0_mono
+
+```
+
+
+#Simulation 1: single-langiage, word difficulty + varying levels of language exposure
+
+Taking Simulation 0 as a starting point, this simulation includes varying levels of language exposure. 0% exposure is not included, as it would produce vocabulary sizes of 0 across time, while exposure of 100% should look like Simulation 0, which is equivalent to a monolingual trajectory. Simulation 2 is equivalent to vocabulary growth in one language for bilingual children with different levels of exposure.
+
+```{r Code for S1}
+load("data/word_difficulty_df.RDS")
+
+vocabsize_by_time_df1 <- setNames(data.frame(matrix(ncol = 5, nrow = 0)), c("time_point", "lang_exposure", "experience_gained", "vocabulary_size", "new_words")) # Create an empty df to put the time that has passed, language exposure, and the vocabulary size at each time point
+
+# lang_exposure_levels <-  c(0.25, 0.50, 0.75, 1) # We'll go through each exposure level on the outer loop
+lang_exposure_levels <-  c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1) # We'll go through each exposure level on the outer loop
+
+# NOTE: The word difficulty data frame created in S1 is used here
+
+for (level in lang_exposure_levels) {
+  
+  # The next variables will be reset once each outer loop restarts
+  time_range <- 0:24800 # 24,800 is roughly four times the max word difficulty
+  experience_gained <- 0
+  vocabulary_size <- 0 # Create a variable to be used in the inner loop
+  previous_vocabulary_size <- 0 # Create a variable to be used in the inner loop
+  
+  for (i in time_range) {
+  time_point <- i # Time elapsed equals each instance of time_range
+  lang_exposure <- level
+  experience_gained <- lang_exposure * time_point
+  vocabulary_size <- sum(word_difficulty_df$difficulty <= experience_gained, na.rm=TRUE) # Estimates the total number of words that have accumulated enough experience at the current time point
+  new_words <- vocabulary_size - previous_vocabulary_size # Estimates the number of new words that were learned at the current time point, based on the previous loop's vocabulary size
+  # new_words <- sum(word_difficulty_df$difficulty == time_point | word_difficulty_df$difficulty > (time_point - 1), na.rm=TRUE)
+  row_data <- c(time_point, lang_exposure, experience_gained, vocabulary_size, new_words)
+  # print(row_data)
+  vocabsize_by_time_df1[nrow(vocabsize_by_time_df1) + 1,] <- row_data
+  previous_vocabulary_size <- vocabulary_size # This line sets the vocabulary size of the current loop to be used as the "previous" vocabulary size for the next loop
+  
+  # print(i) # This line is to check that the loop is doing what it's supposed to do
+  # print(time_elapsed) # This line is to check that the loop is doing what it's supposed to do
+  # print(vocabulary_size)# This line is to check that the loop is doing what it's supposed to do
+  if(vocabulary_size == 10000) { # Stop the current inner loop once the max vocabulary size (10,000 words) is reached
+    break
+  }
+}
+}
+
+save(vocabsize_by_time_df1, file = "data/vocabsize_by_time_df1.RDS")
+
+# # Smooth plot of vocabulary size across time
+# simulation_2.1_viz <- ggplot(data = vocabsize_by_time_df2.1, aes(x = time_point, y = vocabulary_size, color = as.factor(lang_exposure))) +
+#   geom_line()
+#   # geom_smooth() 
+# 
+# ggsave("figures/simulation_2.1_viz.png", plot = simulation_2.1_viz, 
+#        width = 12,
+#        height = 4
+#        )
+```
+
+```{r Viz S1}
+load("data/vocabsize_by_time_df1.RDS")
+
+# Convert language exposure to percentage and factor
+vocabsize_by_time_df1 <- vocabsize_by_time_df1 %>% 
+  mutate(lang_exposure = as.factor(lang_exposure * 100))
+
+# Smooth plot of vocabulary size across time
+sim1_viz <- ggplot(data = vocabsize_by_time_df1, aes(x = time_point, y = vocabulary_size, color = lang_exposure)) +
+  geom_smooth() +
+  labs(#title = "Simulation 1: Single-Language Vocabulary Without Transfer",
+       x = "Time steps",
+       y = "Single-language vocabulary size (words)",
+      color = "Language \nexposure (%)") +
+  geom_vline(xintercept = 6000, linetype = "dashed") +
+  scale_color_manual(values=my_colors)
+sim1_viz
+
+beep()
+```
+
+#Simulation 2: word vocabulary, word difficulty + varying levels of language exposure
+
+S2 simulates word vocabulary acquisition (i.e., the sum of the words learned in two languages) for bilingual children. This type of vocabulary counts translation equivalents (TEs) as independent words (i.e., "dog" in English and "chien" in French count as two separate words). Simulation 3 assumes there is no cross-linguistic transfer, that is, TEs are learned independently.
+
+This simulation uses the same 10,000 (pseudo)words for both languages and assume that the difficulty for the same word in each language is different; difficulty in both languages follow a Gaussian distribution with the same parameters.
+
+```{r Code for S2: word difficulty}
+# Create a data frame with word difficulty for two languages.
+
+set.seed(11) # Setting the seed will allow us to get the same results every time, as rpois() generates random numbers
+word_difficulty_two_langs_df <- data.frame(words <- stri_rand_strings(10000, 5), # Generate 10,000 random pseudo-words with 5 characters each
+                                 # difficulty <- rpois(n = 10000, lambda = 4000))  # Using rpois() for a poisson distribution (i.e., having discrete counts; you can't need 23.2 times of hearing the word to learn it).
+                                 difficulty_lang1 <- rnorm(n = 10000, mean = 4000, sd = 600),# Using rnorm() just to get a smoother curve; it produces continuous values. 
+                                 difficulty_lang2 <- rnorm(n = 10000, mean = 4000, sd = 600)
+)
+  colnames(word_difficulty_two_langs_df) <- c("words", "difficulty_lang1", "difficulty_lang2")
+  
+# Visualize word difficulty in each language
+lang1_difficulty <- hist(word_difficulty_two_langs_df$difficulty_lang1, breaks = 20)
+lang2_difficulty <- hist(word_difficulty_two_langs_df$difficulty_lang2, breaks = 20)
+plot(lang1_difficulty, col=rgb(0,0,1,1/4))  # first histogram
+plot(lang2_difficulty, col=rgb(1,0,0,1/4), add=T)  # second histogram
+
+save(word_difficulty_two_langs_df, file = "data/word_difficulty_two_langs_df.RDS")
+```
+
+```{r Code for S2: loop}
+# Create an empty df to put the time that has passed, language exposure, and the vocabulary size at each time point. The ending "_#" indicates which language that column refers to (i.e., language 1 or language 2)
+vocabsize_by_time_df2 <- setNames(data.frame(matrix(ncol = 10, nrow = 0)), c("time_point", 
+                                                                            "lang_exposure_1", "experience_gained_1", "vocabulary_size_1", "new_words_1",
+                                                                            "lang_exposure_2", "experience_gained_2", "vocabulary_size_2", "new_words_2",
+                                                                            "word_vocabulary_size")) 
+
+lang_exposure_levels_1 <-  c(0.50, 0.6, 0.7, 0.8, 0.9, 1) # We'll go through each exposure level on the outer loop
+# lang_exposure_levels_1 <-  c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1) # We'll go through each exposure level on the outer loop
+
+# NOTE: The word difficulty data frame created in S3 is used here, which includes difficulty in two languages.
+
+for (level in lang_exposure_levels_1) {
+  
+  # The next variables will be reset once each outer loop restarts
+  time_range <- 0:30000 # Extend time, so the language with 10% exposure can show an increase in vocabulary size
+  experience_gained_1 <- 0
+  vocabulary_size_1 <- 0 # Create a variable to be used in the inner loop
+  previous_vocabulary_size_1 <- 0 # Create a variable to be used in the inner loop
+  previous_vocabulary_size_2 <- 0
+  
+  for (i in time_range) {
+  time_point <- i # Time elapsed equals each instance of time_range
+  
+  # Start with variables for language 1
+  lang_exposure_1 <- level
+  experience_gained_1 <- lang_exposure_1 * time_point
+  vocabulary_size_1 <- sum(word_difficulty_two_langs_df$difficulty_lang1 <= experience_gained_1, na.rm=TRUE) # Estimates the total number of words that have accumulated enough experience at the current time point for language 1
+  new_words_1 <- vocabulary_size_1 - previous_vocabulary_size_1 # Estimates the number of new words that were learned at the current time point, based on the previous loop's vocabulary size
+  
+  # Continue with the same variables, but for language 2
+  lang_exposure_2 <- 1 - lang_exposure_1 # Exposure to language 2 is the relative exposure after removing language 1
+  experience_gained_2 <- lang_exposure_2 * time_point
+  vocabulary_size_2 <- sum(word_difficulty_two_langs_df$difficulty_lang2 <= experience_gained_2, na.rm=TRUE)
+  new_words_2 <- vocabulary_size_2 - previous_vocabulary_size_2
+  
+  # Estimate word vocabulary size (i.e., vocabulary across both languages)
+  word_vocabulary_size <- vocabulary_size_1 + vocabulary_size_2
+  
+  row_data <- c(time_point, 
+                lang_exposure_1, experience_gained_1, vocabulary_size_1, new_words_1,
+                lang_exposure_2, experience_gained_2, vocabulary_size_2, new_words_2,
+                word_vocabulary_size)
+  # print(row_data)
+  vocabsize_by_time_df2[nrow(vocabsize_by_time_df2) + 1,] <- row_data
+  
+  # These lines sets the vocabulary size of the current loop to be used as the "previous" vocabulary size for the next loop
+  previous_vocabulary_size_1 <- vocabulary_size_1 
+  previous_vocabulary_size_2 <- vocabulary_size_2
+  
+  # print(i) # This line is to check that the loop is doing what it's supposed to do
+
+  if(word_vocabulary_size == 20000) { # Stop the current inner loop once the max vocabulary size (10,000 words * 2) is reached
+    break
+  }
+}
+}
+
+beep()
+
+save(vocabsize_by_time_df2, file = "data/vocabsize_by_time_df2.RDS")
+```
+
+```{r Code for S2: visualizations}
+load("data/vocabsize_by_time_df2.RDS")
+
+# Convert exposure balance to percentage and factor
+vocabsize_by_time_df2 <- vocabsize_by_time_df2 %>% 
+  mutate(lang_exposure_2 = as.factor(lang_exposure_2 * 100))
+
+# Smooth plot of vocabulary size across time
+sim2_viz <- ggplot(data = vocabsize_by_time_df2, aes(x = time_point, y = word_vocabulary_size, color = lang_exposure_2)) +
+  # geom_smooth() +
+  geom_line() +
+  labs(title = "Simulation 2: Total Word Vocabulary Without Transfer",
+       x = "Time steps",
+       y = "Total word vocabulary size (words)",
+      color = "Exposure balance (%)") +
+  geom_vline(xintercept = 6000, linetype="dashed") +
+  geom_vline(xintercept = 12000, linetype="dashed") +
+  scale_color_manual(values=my_colors) 
+  # theme(#text=element_text(size=15),
+  #       legend.position = "none")
+sim2_viz
+
+```
+
+#Simulation 3: concept vocabulary, word difficulty + varying levels of language exposure
+This simulation is similar to S2 in that it models vocabulary size across languages for bilingual children with varying levels of language exposure. S4 simulates concept vocabulary, where TEs are counted as a single concept, instead of two separate words (i.e., if a child know "dog" and "chien" it is counted as one concept). 
+
+S3 follows the same assumptions as S2: there is no transfer across languages and word difficulty follows a Gaussian distribution. The same data frame of (pseudo)words and their corresponding difficulty in two languages from S3 will be used.
+
+```{r Tiny set of words}
+# Tiny set of words to be used to develop concept acquisition simulation
+words <-  c("dog", "apple", "baby", "mom", "dad")
+difficulty_lang1 <- c(1, 2, 3, 4, 5)
+difficulty_lang2 <- c(1, 3, 4, 2, 5)
+tiny_concept_difficulty_df <- cbind.data.frame(words, difficulty_lang1, difficulty_lang2)
+```
+
+```{r Code for S3: concept difficulty}
+# Create an empty df to put the time needed to learn a word based on its difficulty and language exposure, to then determine the minimum time to learn a singlet in the TE pair. The ending "_#" indicates which language that column refers to (i.e., language 1 or language 2)
+
+word_difficulty_by_exposure <- setNames(data.frame(matrix(ncol = 7, nrow = 0)), c("word", 
+                                                                              "lang_exposure_1", "difficulty_1", "time_needed_1",
+                                                                              "lang_exposure_2", "difficulty_2", "time_needed_2"
+                                                                              ))
+
+# Iterate over rows and language exposure levels
+for (row in seq_len(nrow(word_difficulty_two_langs_df))) {
+  word <- word_difficulty_two_langs_df[row, "words"]
+  difficulty_1 <- word_difficulty_two_langs_df[row, "difficulty_lang1"]
+  difficulty_2 <- word_difficulty_two_langs_df[row, "difficulty_lang2"]
+  
+  lang_exposure_levels <-  c(0.50, 0.6, 0.7, 0.8, 0.9) # We'll go through each exposure level on the outer loop 
+  
+  for (level in lang_exposure_levels) {
+    lang_exposure_1 <- level
+    lang_exposure_2 <- 1 - lang_exposure_1 # Exposure to language 2 is the relative exposure after removing language 1
+    # Estimate the time needed to learn a singlet based on its difficulty and exposure
+    time_needed_1 <- difficulty_1 * (1 / lang_exposure_1)
+    time_needed_2 <- difficulty_2 * (1 / lang_exposure_2)
+    
+    # Combine data into a row and append it to the data frame
+    row_data <- data.frame(
+      word = word,
+      lang_exposure_1 = lang_exposure_1,
+      difficulty_1 = difficulty_1,
+      time_needed_1 = time_needed_1,
+      lang_exposure_2 = lang_exposure_2,
+      difficulty_2 = difficulty_2,
+      time_needed_2 = time_needed_2,
+      stringsAsFactors = FALSE
+    )
+    
+    word_difficulty_by_exposure <- rbind(word_difficulty_by_exposure, row_data)
+  }
+}
+
+# Out of the TEs in each language, determine which label will be learned first
+word_difficulty_by_exposure <- word_difficulty_by_exposure %>% 
+  # The time needed to learn a concept is the time it takes to learn the first singlet
+  mutate(time_needed_concept = case_when(time_needed_1 < time_needed_2 ~ time_needed_1,
+                                     time_needed_2 < time_needed_1 ~ time_needed_2,
+                                     time_needed_1 == time_needed_2 ~ time_needed_1),
+         # Keep track of the language of the singlet that was learned. For balanced exposure (i.e., 50%) we'll keep language 1
+         easy_word_lang = case_when(time_needed_1 < time_needed_2 ~ "lang_1",
+                                     time_needed_2 < time_needed_1 ~ "lang_2",
+                                     time_needed_1 == time_needed_2 ~ "lang_1"),
+         exposure_balance = lang_exposure_2, # Exposure balanced is computed as the exposure to language 2
+         # Keep track of the exposure of the singlet that was learned. For balanced exposure (i.e., 50%) we'll keep language 1
+         concept_exposure = case_when(easy_word_lang == "lang_1" ~ lang_exposure_1,
+                                      easy_word_lang == "lang_2" ~ lang_exposure_2))
+
+save(word_difficulty_by_exposure, file = "data/word_difficulty_by_exposure.RDS")
+```
+
+```{r Code for S3: loop}
+# Create an empty df where we'll put the time that has passed, exposure balance, and the concept vocabulary size at each time point. 
+vocabsize_by_time_df3 <- setNames(data.frame(matrix(ncol = 3, nrow = 0)), c("time_point", 
+                                                                              "exposure_balance", 
+                                                                              "concept_vocabulary_size")) 
+
+exposure_balance_levels <-  c(0.1, 0.2, 0.3, 0.4, 0.5) # We'll go through each exposure level on the outer loop 
+concept_vocabulary_size <- 0
+
+
+for (level in exposure_balance_levels) {
+  time_range <- 0:12000 # Enough time so the concept that takes the longest can be learned
+  current_exposure_balance <- level
+  
+  # Keep only the rows of the df that match exposure balance to go through each of them in the next-inner loop
+  current_df <- data.frame(word_difficulty_by_exposure %>%
+      # filter(exposure_balance == current_exposure_balance) # This line was not working for some levels of exposure balance
+        filter(abs(exposure_balance - current_exposure_balance) < .Machine$double.eps^0.5)
+      )
+  # print(current_df) # This line is used only to see what is happening while running the loop
+  
+  for (i in time_range) {
+    time_point <- i # Time elapsed equals each instance of time_range
+    
+    concept_vocabulary_size <- sum(current_df$time_needed_concept <= time_point, na.rm=TRUE) # Estimates the total number of concepts have been learned at the current time point
+    
+    # Append the data from the current loop as a row of the df
+    row_data <- c(time_point, current_exposure_balance, concept_vocabulary_size)
+    vocabsize_by_time_df3[nrow(vocabsize_by_time_df3) + 1,] <- row_data 
+    # print(row_data) # This line is used only to see what is happening while running the loop
+    
+    if(concept_vocabulary_size == 10000) { # Stop the current inner loop once the max vocabulary size (10,000 concepts) is reached
+    break
+    }
+  }
+}
+
+beep()
+
+save(vocabsize_by_time_df3, file = "data/vocabsize_by_time_df3.RDS")
+```
+
+```{r Code for S3: visualizations}
+load("data/vocabsize_by_time_df3.RDS")
+
+# Convert exposure balance to percentage and factor
+vocabsize_by_time_df3 <- vocabsize_by_time_df3 %>% 
+  mutate(exposure_balance = as.factor(exposure_balance * 100))
+
+
+# Smooth plot of vocabulary size across time
+sim3_viz <- ggplot(data = vocabsize_by_time_df3, aes(x = time_point, y = concept_vocabulary_size, color = exposure_balance)) +
+  # geom_smooth() +
+  geom_line() +
+  labs(title = "Simulation 3: Concept Vocabulary Without Transfer",
+       x = "Time steps",
+       y = "Concept vocabulary size (words)",
+      color = "Exposure balance (%)") +
+  geom_vline(xintercept = 6000, linetype="dashed") +
+  scale_color_manual(values=my_colors)
+
+sim3_viz
+
+```
+
+#Simulation 4: word vocabulary, transfer + word difficulty + varying levels of language exposure
+
+S4, assumes that all words have the same degree of transfer (although this is probably not true, considering potential benefits from cognates). For example, for every time that a child hears "dog", one experience unit is added to the "dog" register and half a drop is added to the "chien" register, if the degree of transfer is 0.5
+
+```{r Code for S4: word difficulty}
+# # NOTE: We'll use the word difficulty data frame created for S3 (word_difficulty_two_langs_df), which includes difficulty in two languages.
+# # NOTE FOR THE NOTE: for the first runs we'll go with 1,000 words only, so it doesn't take ages to run.
+# 
+# set.seed(11) # Setting the seed will allow us to get the same results every time, as rpois() generates random numbers
+# word_difficulty_two_langs_df <- data.frame(words <- stri_rand_strings(1000, 5), # Generate 10,000 random pseudo-words with 5 characters each
+#                                  # difficulty <- rpois(n = 10000, lambda = 4000))  # Using rpois() for a poisson distribution (i.e., having discrete counts; you can't need 23.2 times of hearing the word to learn it).
+#                                  difficulty_lang1 <- rnorm(n = 1000, mean = 4000, sd = 600),# Using rnorm() just to get a smoother curve; it produces continuous values. 
+#                                  difficulty_lang2 <- rnorm(n = 1000, mean = 4000, sd = 600)
+# )
+#   colnames(word_difficulty_two_langs_df) <- c("words", "difficulty_lang1", "difficulty_lang2")
+#   
+# # Visualize word difficulty in each language
+# lang1_difficulty <- hist(word_difficulty_two_langs_df$difficulty_lang1, breaks = 20)
+# lang2_difficulty <- hist(word_difficulty_two_langs_df$difficulty_lang2, breaks = 20)
+# plot(lang1_difficulty, col=rgb(0,0,1,1/4))  # first histogram
+# plot(lang2_difficulty, col=rgb(1,0,0,1/4), add=T)  # second histogram
+
+```
+
+```{r Code for S4: loop}
+# Create an empty df where we'll put the time that has passed, language exposure, and the vocabulary size at each time point. The ending "_#" indicates which language that column refers to (i.e., language 1 or language 2)
+vocabsize_by_time_df4 <- setNames(data.frame(matrix(ncol = 15, nrow = 0)), c("time_point", "spillover_degree",
+                                                                            "lang_exposure_1", "direct_experience_gained_1","spillovered_experience_gained_1", "total_experience_gained_1", "vocabulary_size_1", "new_words_1",
+                                                                            "lang_exposure_2", "direct_experience_gained_2","spillovered_experience_gained_2", "total_experience_gained_2", "vocabulary_size_2", "new_words_2",
+                                                                            "word_vocabulary_size")) 
+
+lang_exposure_levels_1 <-  c(0.50, 0.60, 0.70, 0.80, 0.90) # We'll go through each exposure level on the outer loop
+spillover_degree <- c(0.50) 
+
+
+for (level in lang_exposure_levels_1) {
+  
+  # The next variables will be reset once each outer loop restarts
+  time_range <- 0:30000 # More or less the time it would take to learn the hardest word at 25% exposure
+  # direct_experience_gained_1 <- 0
+  # vocabulary_size_1 <- 0 # Create a variable to be used in the inner loop
+  previous_vocabulary_size_1 <- 0 # Create a variable to be used in the inner loop
+  previous_vocabulary_size_2 <- 0
+  
+  for (i in time_range) {
+  time_point <- i # Time elapsed equals each instance of time_range
+  spillover_degree <- spillover_degree
+  
+  # Start with variables for language 1
+  lang_exposure_1 <- level
+  lang_exposure_2 <- 1 - lang_exposure_1 # Exposure to language 2 is the relative exposure after removing language 1
+  # These lines estimate the experience gained by hearing word XYZ in its own language
+  direct_experience_gained_1 <- lang_exposure_1 * time_point
+  direct_experience_gained_2 <- lang_exposure_2 * time_point
+  # These lines estimate the experience gained by hearing word XYZ in the other language language
+  spillovered_experience_gained_1 <- direct_experience_gained_2 * spillover_degree
+  spillovered_experience_gained_2 <- direct_experience_gained_1 * spillover_degree
+  # These lines estimate the total experience gained from hearing the word XYZ in its own and the other language
+  total_experience_gained_1 <- direct_experience_gained_1 + spillovered_experience_gained_1
+  total_experience_gained_2 <- direct_experience_gained_2 + spillovered_experience_gained_2
+  # These lines estimate the vocabulary size in each language at each time point
+  vocabulary_size_1 <- sum(word_difficulty_two_langs_df$difficulty_lang1 <= total_experience_gained_1, na.rm=TRUE)
+  vocabulary_size_2 <- sum(word_difficulty_two_langs_df$difficulty_lang2 <= total_experience_gained_2, na.rm=TRUE)
+  # Estimates the number of new words that were learned at the current time point, based on the previous loop's vocabulary size
+  new_words_1 <- vocabulary_size_1 - previous_vocabulary_size_1 
+  new_words_2 <- vocabulary_size_2 - previous_vocabulary_size_2
+  
+  # Estimate word vocabulary size (i.e., vocabulary across both languages)
+  word_vocabulary_size <- vocabulary_size_1 + vocabulary_size_2
+  
+  row_data <- c(time_point, spillover_degree,
+                lang_exposure_1, direct_experience_gained_1, spillovered_experience_gained_1, total_experience_gained_1, vocabulary_size_1, new_words_1,
+                lang_exposure_2, direct_experience_gained_2, spillovered_experience_gained_2, total_experience_gained_2, vocabulary_size_2, new_words_2,
+                word_vocabulary_size)
+  # print(row_data)
+  vocabsize_by_time_df4[nrow(vocabsize_by_time_df4) + 1,] <- row_data
+  
+  # These lines sets the vocabulary size of the current loop to be used as the "previous" vocabulary size for the next loop
+  previous_vocabulary_size_1 <- vocabulary_size_1 
+  previous_vocabulary_size_2 <- vocabulary_size_2
+  
+  # print(i) # This line is to check that the loop is doing what it's supposed to do
+
+  if(word_vocabulary_size == 20000) { # Stop the current inner loop once the max vocabulary size (10,000 words * 2) is reached
+    break
+  }
+}
+}
+
+beep()
+
+save(vocabsize_by_time_df4, file = "data/vocabsize_by_time_df4.RDS")
+
+```
+
+```{r Code for S4: visualizations}
+load("data/vocabsize_by_time_df4.RDS")
+
+# Convert exposure balance to percentage and factor
+vocabsize_by_time_df4 <- vocabsize_by_time_df4 %>% 
+  mutate(lang_exposure_2 = as.factor(lang_exposure_2 * 100))
+
+# Smooth plot of vocabulary size across time
+sim4_viz <- ggplot(data = vocabsize_by_time_df4, aes(x = time_point, y = word_vocabulary_size, color = as.factor(lang_exposure_2))) +
+  # geom_smooth() +
+  geom_line() +
+  labs(title = "Simulation 4: Total Word Vocabulary With Transfer",
+       x = "Time steps",
+       y = "Total word vocabulary size (words)",
+      color = "Exposure balance (%)") +
+    geom_vline(xintercept = 6000, linetype="dashed") +
+  geom_vline(xintercept = 12000, linetype="dashed") +
+  scale_color_manual(values=my_colors) 
+
+sim4_viz
+
+```
+#Simulation 5: concept vocabulary, transfer + word difficulty + varying levels of language exposure
+
+```{r Code for S5: concept difficulty}
+# Create an empty df to put the time needed to learn a word based on its difficulty and language exposure, to then determine the minimum time to learn a singlet in the TE pair. The ending "_#" indicates which language that column refers to (i.e., language 1 or language 2)
+
+word_difficulty_by_exposure_transfer <- setNames(data.frame(matrix(ncol = 8, nrow = 0)), c("word", "transfer_degree",
+                                                                              "lang_exposure_1", "difficulty_1", "time_needed_1",
+                                                                              "lang_exposure_2", "difficulty_2", "time_needed_2"
+                                                                              ))
+transfer_degree <- 0.5
+
+# Iterate over rows and language exposure levels
+for (row in seq_len(nrow(word_difficulty_two_langs_df))) {
+  word <- word_difficulty_two_langs_df[row, "words"]
+  difficulty_1 <- word_difficulty_two_langs_df[row, "difficulty_lang1"]
+  difficulty_2 <- word_difficulty_two_langs_df[row, "difficulty_lang2"]
+  
+  lang_exposure_levels <-  c(0.50, 0.6, 0.7, 0.8, 0.9) # We'll go through each exposure level on the outer loop 
+  
+  for (level in lang_exposure_levels) {
+    lang_exposure_1 <- level
+    lang_exposure_2 <- 1 - lang_exposure_1 # Exposure to language 2 is the relative exposure after removing language 1
+    # Estimate the time needed to learn a singlet based on its difficulty and exposure
+    time_needed_1 <- difficulty_1 * (1 / (lang_exposure_1 + (lang_exposure_2 * transfer_degree)))
+    time_needed_2 <- difficulty_2 * (1 / (lang_exposure_2 + (lang_exposure_1 * transfer_degree)))
+    
+    # Combine data into a row and append it to the data frame
+    row_data <- data.frame(
+      word = word,
+      transfer_degree = transfer_degree,
+      lang_exposure_1 = lang_exposure_1,
+      difficulty_1 = difficulty_1,
+      time_needed_1 = time_needed_1,
+      lang_exposure_2 = lang_exposure_2,
+      difficulty_2 = difficulty_2,
+      time_needed_2 = time_needed_2,
+      stringsAsFactors = FALSE
+    )
+    
+    word_difficulty_by_exposure_transfer <- rbind(word_difficulty_by_exposure_transfer, row_data)
+  }
+}
+
+# Out of the TEs in each language, determine which label will be learned first
+word_difficulty_by_exposure_transfer <- word_difficulty_by_exposure_transfer %>% 
+  # The time needed to learn a concept is the time it takes to learn the first singlet
+  mutate(time_needed_concept = case_when(time_needed_1 < time_needed_2 ~ time_needed_1,
+                                     time_needed_2 < time_needed_1 ~ time_needed_2,
+                                     time_needed_1 == time_needed_2 ~ time_needed_1),
+         # Keep track of the language of the singlet that was learned. For balanced exposure (i.e., 50%) we'll keep language 1
+         easy_word_lang = case_when(time_needed_1 < time_needed_2 ~ "lang_1",
+                                     time_needed_2 < time_needed_1 ~ "lang_2",
+                                     time_needed_1 == time_needed_2 ~ "lang_1"),
+         exposure_balance = lang_exposure_2, # Exposure balanced is computed as the exposure to language 2
+         # Keep track of the exposure of the singlet that was learned. For balanced exposure (i.e., 50%) we'll keep language 1
+         concept_exposure = case_when(easy_word_lang == "lang_1" ~ lang_exposure_1,
+                                      easy_word_lang == "lang_2" ~ lang_exposure_2))
+
+save(word_difficulty_by_exposure_transfer, file = "data/word_difficulty_by_exposure_transfer.RDS")
+
+```
+
+```{r Code for S5: loop}
+# Create an empty df where we'll put the time that has passed, exposure balance, and the concept vocabulary size at each time point. 
+vocabsize_by_time_df5 <- setNames(data.frame(matrix(ncol = 3, nrow = 0)), c("time_point", 
+                                                                              "exposure_balance", 
+                                                                              "concept_vocabulary_size")) 
+
+exposure_balance_levels <-  c(0.1, 0.2, 0.3, 0.4, 0.5) # We'll go through each exposure level on the outer loop 
+concept_vocabulary_size <- 0
+
+
+for (level in exposure_balance_levels) {
+  time_range <- 0:12000 # Enough time so the concept that takes the longest can be learned
+  current_exposure_balance <- level
+  
+  # Keep only the rows of the df that match exposure balance to go through each of them in the next-inner loop
+  current_df <- data.frame(word_difficulty_by_exposure_transfer %>%
+      # filter(exposure_balance == current_exposure_balance) # This line was not working for some levels of exposure balance
+        filter(abs(exposure_balance - current_exposure_balance) < .Machine$double.eps^0.5)
+      )
+  # print(current_df) # This line is used only to see what is happening while running the loop
+  
+  for (i in time_range) {
+    time_point <- i # Time elapsed equals each instance of time_range
+    
+    concept_vocabulary_size <- sum(current_df$time_needed_concept <= time_point, na.rm=TRUE) # Estimates the total number of concepts have been learned at the current time point
+    
+    # Append the data from the current loop as a row of the df
+    row_data <- c(time_point, current_exposure_balance, concept_vocabulary_size)
+    vocabsize_by_time_df5[nrow(vocabsize_by_time_df5) + 1,] <- row_data 
+    # print(row_data) # This line is used only to see what is happening while running the loop
+    
+    if(concept_vocabulary_size == 10000) { # Stop the current inner loop once the max vocabulary size (10,000 concepts) is reached
+    break
+    }
+  }
+}
+
+beep()
+
+save(vocabsize_by_time_df5, file = "data/vocabsize_by_time_df5.RDS")
+```
+
+```{r S5: label learned for each concept}
+first_label_learned <- word_difficulty_by_exposure_transfer %>% 
+  mutate(exposure_balance = as.factor(exposure_balance)) %>% 
+  group_by(easy_word_lang, exposure_balance) %>% 
+  summarise(N_items = n())
+```
+
+```{r Code for S5: visualizations}
+load("data/vocabsize_by_time_df5.RDS")
+
+# Convert exposure balance to percentage and factor
+vocabsize_by_time_df5 <- vocabsize_by_time_df5 %>% 
+  mutate(exposure_balance = as.factor(exposure_balance * 100))
+
+# Smooth plot of vocabulary size across time
+sim5_viz <- ggplot(data = vocabsize_by_time_df5, aes(x = time_point, y = concept_vocabulary_size, color = exposure_balance)) +
+  # geom_smooth() +
+  geom_line() +
+  labs(title = "Simulation 5: Concept Vocabulary With Transfer",
+       x = "Time steps",
+       y = "Concept vocabulary size (words)",
+      color = "Exposure balance (%)") +
+  geom_vline(xintercept = 6000, linetype="dashed") +
+  scale_color_manual(values=my_colors)
+
+sim5_viz
+```
+
+#Simulation 6: word vocabulary, full transfer + word difficulty + varying levels of language exposure
+
+```{r Code for S6: loop}
+# Create an empty df where we'll put the time that has passed, language exposure, and the vocabulary size at each time point. The ending "_#" indicates which language that column refers to (i.e., language 1 or language 2)
+vocabsize_by_time_df6 <- setNames(data.frame(matrix(ncol = 15, nrow = 0)), c("time_point", "spillover_degree",
+                                                                            "lang_exposure_1", "direct_experience_gained_1","spillovered_experience_gained_1", "total_experience_gained_1", "vocabulary_size_1", "new_words_1",
+                                                                            "lang_exposure_2", "direct_experience_gained_2","spillovered_experience_gained_2", "total_experience_gained_2", "vocabulary_size_2", "new_words_2",
+                                                                            "word_vocabulary_size")) 
+
+lang_exposure_levels_1 <-  c(0.50, 0.60, 0.70, 0.80, 0.90) # We'll go through each exposure level on the outer loop
+spillover_degree <- 1 
+
+
+for (level in lang_exposure_levels_1) {
+  
+  # The next variables will be reset once each outer loop restarts
+  time_range <- 0:30000 # More or less the time it would take to learn the hardest word at 25% exposure
+  # direct_experience_gained_1 <- 0
+  # vocabulary_size_1 <- 0 # Create a variable to be used in the inner loop
+  previous_vocabulary_size_1 <- 0 # Create a variable to be used in the inner loop
+  previous_vocabulary_size_2 <- 0
+  
+  for (i in time_range) {
+  time_point <- i # Time elapsed equals each instance of time_range
+  spillover_degree <- spillover_degree
+  
+  # Start with variables for language 1
+  lang_exposure_1 <- level
+  lang_exposure_2 <- 1 - lang_exposure_1 # Exposure to language 2 is the relative exposure after removing language 1
+  # These lines estimate the experience gained by hearing word XYZ in its own language
+  direct_experience_gained_1 <- lang_exposure_1 * time_point
+  direct_experience_gained_2 <- lang_exposure_2 * time_point
+  # These lines estimate the experience gained by hearing word XYZ in the other language language
+  spillovered_experience_gained_1 <- direct_experience_gained_2 * spillover_degree
+  spillovered_experience_gained_2 <- direct_experience_gained_1 * spillover_degree
+  # These lines estimate the total experience gained from hearing the word XYZ in its own and the other language
+  total_experience_gained_1 <- direct_experience_gained_1 + spillovered_experience_gained_1
+  total_experience_gained_2 <- direct_experience_gained_2 + spillovered_experience_gained_2
+  # These lines estimate the vocabulary size in each language at each time point
+  vocabulary_size_1 <- sum(word_difficulty_two_langs_df$difficulty_lang1 <= total_experience_gained_1, na.rm=TRUE)
+  vocabulary_size_2 <- sum(word_difficulty_two_langs_df$difficulty_lang2 <= total_experience_gained_2, na.rm=TRUE)
+  # Estimates the number of new words that were learned at the current time point, based on the previous loop's vocabulary size
+  new_words_1 <- vocabulary_size_1 - previous_vocabulary_size_1 
+  new_words_2 <- vocabulary_size_2 - previous_vocabulary_size_2
+  
+  # Estimate word vocabulary size (i.e., vocabulary across both languages)
+  word_vocabulary_size <- vocabulary_size_1 + vocabulary_size_2
+  
+  row_data <- c(time_point, spillover_degree,
+                lang_exposure_1, direct_experience_gained_1, spillovered_experience_gained_1, total_experience_gained_1, vocabulary_size_1, new_words_1,
+                lang_exposure_2, direct_experience_gained_2, spillovered_experience_gained_2, total_experience_gained_2, vocabulary_size_2, new_words_2,
+                word_vocabulary_size)
+  # print(row_data)
+  vocabsize_by_time_df6[nrow(vocabsize_by_time_df6) + 1,] <- row_data
+  
+  # These lines sets the vocabulary size of the current loop to be used as the "previous" vocabulary size for the next loop
+  previous_vocabulary_size_1 <- vocabulary_size_1 
+  previous_vocabulary_size_2 <- vocabulary_size_2
+  
+  # print(i) # This line is to check that the loop is doing what it's supposed to do
+
+  if(word_vocabulary_size == 20000) { # Stop the current inner loop once the max vocabulary size (10,000 words * 2) is reached
+    break
+  }
+}
+}
+
+beep()
+
+save(vocabsize_by_time_df6, file = "data/vocabsize_by_time_df6.RDS")
+
+```
+
+```{r Code for S6: visualizations}
+load("data/vocabsize_by_time_df6.RDS")
+
+# Convert exposure balance to percentage and factor
+vocabsize_by_time_df6 <- vocabsize_by_time_df6 %>% 
+  mutate(lang_exposure_2 = as.factor(lang_exposure_2 * 100))
+
+# Smooth plot of vocabulary size across time
+sim6_viz <- ggplot(data = vocabsize_by_time_df6, aes(x = time_point, y = word_vocabulary_size, color = lang_exposure_2)) +
+  # geom_smooth() +
+  geom_line() +
+  labs(title = "Simulation 6: Word Vocabulary With Transfer",
+       x = "Time steps",
+       y = "Vocabulary size (words)",
+      color = "Exposure balance (%)") +
+    geom_vline(xintercept = 6000, linetype="dashed") +
+  geom_vline(xintercept = 12000, linetype="dashed") +
+  scale_color_manual(values=my_colors) 
+
+sim6_viz
+
+```
+
+#Simulation 7: concept vocabulary, full transfer + word difficulty + varying levels of language exposure
+
+```{r Code for S5: concept difficulty}
+# Create an empty df to put the time needed to learn a word based on its difficulty and language exposure, to then determine the minimum time to learn a singlet in the TE pair. The ending "_#" indicates which language that column refers to (i.e., language 1 or language 2)
+
+word_difficulty_by_exposure_full_transfer <- setNames(data.frame(matrix(ncol = 8, nrow = 0)), c("word", "transfer_degree",
+                                                                              "lang_exposure_1", "difficulty_1", "time_needed_1",
+                                                                              "lang_exposure_2", "difficulty_2", "time_needed_2"
+                                                                              ))
+transfer_degree <- 1
+
+# Iterate over rows and language exposure levels
+for (row in seq_len(nrow(word_difficulty_two_langs_df))) {
+  word <- word_difficulty_two_langs_df[row, "words"]
+  difficulty_1 <- word_difficulty_two_langs_df[row, "difficulty_lang1"]
+  difficulty_2 <- word_difficulty_two_langs_df[row, "difficulty_lang2"]
+  
+  lang_exposure_levels <-  c(0.50, 0.6, 0.7, 0.8, 0.9) # We'll go through each exposure level on the outer loop 
+  
+  for (level in lang_exposure_levels) {
+    lang_exposure_1 <- level
+    lang_exposure_2 <- 1 - lang_exposure_1 # Exposure to language 2 is the relative exposure after removing language 1
+    # Estimate the time needed to learn a singlet based on its difficulty and exposure
+    time_needed_1 <- difficulty_1 * (1 / (lang_exposure_1 + (lang_exposure_2 * transfer_degree)))
+    time_needed_2 <- difficulty_2 * (1 / (lang_exposure_2 + (lang_exposure_1 * transfer_degree)))
+    
+    # Combine data into a row and append it to the data frame
+    row_data <- data.frame(
+      word = word,
+      transfer_degree = transfer_degree,
+      lang_exposure_1 = lang_exposure_1,
+      difficulty_1 = difficulty_1,
+      time_needed_1 = time_needed_1,
+      lang_exposure_2 = lang_exposure_2,
+      difficulty_2 = difficulty_2,
+      time_needed_2 = time_needed_2,
+      stringsAsFactors = FALSE
+    )
+    
+    word_difficulty_by_exposure_full_transfer <- rbind(word_difficulty_by_exposure_full_transfer, row_data)
+  }
+}
+
+# Out of the TEs in each language, determine which label will be learned first
+word_difficulty_by_exposure_full_transfer <- word_difficulty_by_exposure_full_transfer %>% 
+  # The time needed to learn a concept is the time it takes to learn the first singlet
+  mutate(time_needed_concept = case_when(time_needed_1 < time_needed_2 ~ time_needed_1,
+                                     time_needed_2 < time_needed_1 ~ time_needed_2,
+                                     time_needed_1 == time_needed_2 ~ time_needed_1),
+         # Keep track of the language of the singlet that was learned. For balanced exposure (i.e., 50%) we'll keep language 1
+         easy_word_lang = case_when(time_needed_1 < time_needed_2 ~ "lang_1",
+                                     time_needed_2 < time_needed_1 ~ "lang_2",
+                                     time_needed_1 == time_needed_2 ~ "lang_1"),
+         exposure_balance = lang_exposure_2, # Exposure balanced is computed as the exposure to language 2
+         # Keep track of the exposure of the singlet that was learned. For balanced exposure (i.e., 50%) we'll keep language 1
+         concept_exposure = case_when(easy_word_lang == "lang_1" ~ lang_exposure_1,
+                                      easy_word_lang == "lang_2" ~ lang_exposure_2))
+
+save(word_difficulty_by_exposure_full_transfer, file = "data/word_difficulty_by_exposure_full_transfer.RDS")
+
+```
+
+```{r Code for S7: loop}
+# Create an empty df where we'll put the time that has passed, exposure balance, and the concept vocabulary size at each time point. 
+vocabsize_by_time_df7 <- setNames(data.frame(matrix(ncol = 3, nrow = 0)), c("time_point", 
+                                                                              "exposure_balance", 
+                                                                              "concept_vocabulary_size")) 
+
+exposure_balance_levels <-  c(0.1, 0.2, 0.3, 0.4, 0.5) # We'll go through each exposure level on the outer loop 
+concept_vocabulary_size <- 0
+
+
+for (level in exposure_balance_levels) {
+  time_range <- 0:12000 # Enough time so the concept that takes the longest can be learned
+  current_exposure_balance <- level
+  
+  # Keep only the rows of the df that match exposure balance to go through each of them in the next-inner loop
+  current_df <- data.frame(word_difficulty_by_exposure_full_transfer %>%
+      # filter(exposure_balance == current_exposure_balance) # This line was not working for some levels of exposure balance
+        filter(abs(exposure_balance - current_exposure_balance) < .Machine$double.eps^0.5)
+      )
+  # print(current_df) # This line is used only to see what is happening while running the loop
+  
+  for (i in time_range) {
+    time_point <- i # Time elapsed equals each instance of time_range
+    
+    concept_vocabulary_size <- sum(current_df$time_needed_concept <= time_point, na.rm=TRUE) # Estimates the total number of concepts have been learned at the current time point
+    
+    # Append the data from the current loop as a row of the df
+    row_data <- c(time_point, current_exposure_balance, concept_vocabulary_size)
+    vocabsize_by_time_df7[nrow(vocabsize_by_time_df7) + 1,] <- row_data 
+    # print(row_data) # This line is used only to see what is happening while running the loop
+    
+    if(concept_vocabulary_size == 10000) { # Stop the current inner loop once the max vocabulary size (10,000 concepts) is reached
+    break
+    }
+  }
+}
+
+beep()
+
+save(vocabsize_by_time_df7, file = "data/vocabsize_by_time_df7.RDS")
+```
+
+```{r Code for S7: visualizations}
+load("data/vocabsize_by_time_df7.RDS")
+
+# Convert exposure balance to percentage and factor
+vocabsize_by_time_df7 <- vocabsize_by_time_df7 %>% 
+  mutate(exposure_balance = as.factor(exposure_balance * 100))
+
+# Smooth plot of vocabulary size across time
+sim7_viz <- ggplot(data = vocabsize_by_time_df7, aes(x = time_point, y = concept_vocabulary_size, color = exposure_balance)) +
+  # geom_smooth() +
+  geom_line() +
+  labs(title = "Simulation 7: Concept Vocabulary With Transfer",
+       x = "Time steps",
+       y = "Vocabulary size (words)",
+      color = "Exposure balance (%)") +
+  geom_vline(xintercept = 6000, linetype="dashed") +
+  scale_color_manual(values=my_colors)
+
+sim7_viz
+```
+
+```{r Arrange and save figures}
+simulations_2_to_3 <- ggarrange(sim2_viz, sim3_viz, 
+                               #labels = c("Simulation 1", "Simulation 2", "Simulation 3", "Simulation 4", "Simulation 5"),
+                               ncol = 1, nrow = 2,
+                               common.legend = TRUE, legend = "bottom")
+simulations_2_to_3
+
+simulations_4_to_5 <- ggarrange(sim4_viz, sim5_viz,
+                               #labels = c("Simulation 1", "Simulation 2", "Simulation 3", "Simulation 4", "Simulation 5"),
+                               ncol = 1, nrow = 2,
+                               common.legend = TRUE, legend = "bottom")
+simulations_4_to_5
+
+  # layout.matrix <- matrix(c(1,3,5,2,4), nrow = 3, ncol = 2)
+  # layout.matrix
+  # 
+  # layout(mat = layout.matrix,
+  #        heights = c(1, 1), # Heights of the two rows
+  #        widths = c(1, 1.3)) # Widths of the two columns
+  # 
+  # layout.show(5)
+
+# all_simulations_viz <-  (sim1_mono+sim2_bi_langexp+sim3_bi_expbal+sim4_bi_expbal+sim5_bi_expbal_transfer) + 
+#   plot_layout(widths = c(1.2,1)) 
+#   # plot_annotation(title = "Study 1: Accumulator Models of Vocabulary Acquisition",
+#   #                 tag_levels = '1',
+#   #                 tag_prefix = "Simulation "
+#   #                 ) 
+# 
+# all_simulations <- grid.arrange(sim1_bi_langexp, sim2_bi_expbal, sim3_bi_expbal, sim4_bi_expbal_transfer, sim5_bi_expbal,
+#                                     ncol = 2, nrow = 3, layout_matrix = rbind(c(1,1),
+#                                                                               c(2,3),
+#                                                                               c(4,5)))
+
+ggsave("figures/simulation_1.png", plot = sim1_viz,
+       width = 20,
+       height = 11,
+       units = "cm"
+       )
+
+ggsave("figures/simulations_2_to_3.png", plot = simulations_2_to_3,
+       width = 20,
+       height = 22,
+       units = "cm"
+       )
+
+ggsave("figures/simulations_4_to_5.png", plot = simulations_4_to_5,
+       width = 20,
+       height = 22,
+       units = "cm"
+       )
+```
+

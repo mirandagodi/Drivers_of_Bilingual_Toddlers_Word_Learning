@@ -262,7 +262,7 @@ vocabsize_by_time_df2 <- vocabsize_by_time_df2 %>%
 sim2_viz <- ggplot(data = vocabsize_by_time_df2, aes(x = time_point, y = word_vocabulary_size, color = lang_exposure_2)) +
   # geom_smooth() +
   geom_line() +
-  labs(title = "Simulation 2: Word Vocabulary Without Transfer",
+  labs(title = "Simulation 2: Total Word Vocabulary Without Transfer",
        x = "Time steps",
        y = "Total word vocabulary size (words)",
       color = "Exposure balance (%)") +
@@ -516,7 +516,7 @@ vocabsize_by_time_df4 <- vocabsize_by_time_df4 %>%
 sim4_viz <- ggplot(data = vocabsize_by_time_df4, aes(x = time_point, y = word_vocabulary_size, color = as.factor(lang_exposure_2))) +
   # geom_smooth() +
   geom_line() +
-  labs(title = "Simulation 4: Word Vocabulary With Transfer",
+  labs(title = "Simulation 4: Total Word Vocabulary With Transfer",
        x = "Time steps",
        y = "Total word vocabulary size (words)",
       color = "Exposure balance (%)") +
