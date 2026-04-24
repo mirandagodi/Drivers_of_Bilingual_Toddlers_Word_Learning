@@ -1,6 +1,6 @@
 ---
-title: 'English monolingual accumulator models: CHILDES + CDI parameters'
-author: "Miranda Gómez Díaz"
+title: 'English monolingual accumulator models'
+author: ""
 date: "`r Sys.Date()`"
 output: html_document
 ---

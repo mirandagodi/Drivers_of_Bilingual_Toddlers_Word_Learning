@@ -1,6 +1,6 @@
 ---
-title: 'Accumulator Simulations: Bilingual Data'
-author: "Miranda Gómez Díaz"
+title: 'Bilingual accumulator models'
+author: ""
 date: '`r Sys.Date()`'
 output: html_document
 ---

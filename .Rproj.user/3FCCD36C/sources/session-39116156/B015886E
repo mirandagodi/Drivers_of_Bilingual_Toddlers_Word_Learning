@@ -1,27 +1,27 @@
 {
-    "id": "34986B23",
+    "id": "B015886E",
     "path": "~/GitHub/Drivers_of_Bilingual_Toddlers_Word_Learning/study_1_accumulator_simulations.Rmd",
     "project_path": "study_1_accumulator_simulations.Rmd",
     "type": "r_markdown",
-    "hash": "2745880277",
+    "hash": "1760405331",
     "contents": "",
     "dirty": false,
-    "created": 1776440242205.0,
+    "created": 1777045875700.0,
     "source_on_save": false,
-    "relative_order": 4,
+    "relative_order": 2,
     "properties": {
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "928,67",
-        "scrollLine": "910",
-        "last_setup_crc32": "b7afb830bb338d19"
+        "cursorPosition": "2,9",
+        "scrollLine": "0",
+        "last_setup_crc32": ""
     },
     "folds": "",
-    "lastKnownWriteTime": 1776440334,
+    "lastKnownWriteTime": 1777045884,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1776440379567,
+    "last_content_update": 1777045884814,
     "read_only": false,
     "read_only_alternatives": []
 }
