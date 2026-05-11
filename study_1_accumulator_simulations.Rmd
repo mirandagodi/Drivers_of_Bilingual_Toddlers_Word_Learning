@@ -522,6 +522,7 @@ sim4_viz <- ggplot(data = vocabsize_by_time_df4, aes(x = time_point, y = word_vo
       color = "Exposure balance (%)") +
     geom_vline(xintercept = 6000, linetype="dashed") +
   geom_vline(xintercept = 12000, linetype="dashed") +
+  theme(plot.margin = margin(t=10, r=10, b=20, l=10, "pt")) +
   scale_color_manual(values=my_colors) 
 
 sim4_viz
@@ -889,7 +890,7 @@ simulations_2_to_3
 
 simulations_4_to_5 <- ggarrange(sim4_viz, sim5_viz,
                                #labels = c("Simulation 1", "Simulation 2", "Simulation 3", "Simulation 4", "Simulation 5"),
-                               ncol = 1, nrow = 2,
+                               ncol = 1, nrow = 2, 
                                common.legend = TRUE, legend = "bottom")
 simulations_4_to_5
 
