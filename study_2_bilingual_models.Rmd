@@ -257,7 +257,7 @@ EngFr_df <- full_join(Eng_df_itemID, Fr_df_itemID, by = c("study_id", "n_months"
 mismatch_sex_df <- EngFr_df %>% 
   group_by(study_id, n_months) %>% 
   filter(row_number() == 1,
-    sex_match == "no") %>% 
+    sex_match == "no") 
 
 
 # Fix age (Due to the nature of the administration process where the questionnaires are sent on the 1st of each month, there would be overlaps in the age when the questionnaires are filled. So when generating the report, we rely on the n_month variable to generate an estimate age to avoid overlaps.)
