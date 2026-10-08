@@ -29,6 +29,11 @@ library(gtsummary)
 library(performance)
 library(ggsci)
 ```
+
+```{r Color palettes}
+frequency_colors <- c("#1A8AD9", "#199DAF", "#19B084", "#18C35A")
+```
+
 # Models using Kachergis et al. monolingual data of nouns only. Files were downloaded from their [OSF repository](https://osf.io/c5u49/).
 ```{r Read CHILDES data}
 # Read Rdata file containing CHILDES data processed by Kachergis et al.
@@ -272,7 +277,7 @@ mono_eng_interactive_viz <- ggplot(data = mono_eng_nouns_only_word_frequency, ae
     # se = FALSE,
     alpha = 0.3
     ) +
-  scale_color_bmj() +
+  scale_color_manual(values=frequency_colors) +
   ylim(NA,1) +
   labs(title = "English Monolingual Word Learning",
        x = "Age (months)",

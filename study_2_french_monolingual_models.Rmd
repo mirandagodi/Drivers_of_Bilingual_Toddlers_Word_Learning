@@ -30,6 +30,7 @@ library(report)
 library(gtsummary)
 library(performance)
 library(ggsci)
+library(ggrepel)
 ```
 
 ```{r Load files}
@@ -38,6 +39,10 @@ TE_list <- read_csv("data/ws_te_list_full.csv") %>%
   # remove unnecessary columns
   select(-c(word_en, word_fr, one_to_many)) %>%
   rename(eng_item_num = en_item_num)
+```
+
+```{r Color palettes}
+frequency_colors <- c("#1A8AD9", "#199DAF", "#19B084", "#18C35A")
 ```
 
 Estimate the number of tokens French-learning children hear per month. Estimates were retrieved from Le Normand & Thai-Van (2022). Table 1 includes the number of children in each age group and the group mean of word tokens heard in a session, which were 20 minutes long
@@ -221,6 +226,42 @@ ggscatter(eng_fre_tokens_per_month_nonhomophones, x = "tok_per_mo_eng", y = "tok
           xlab = "English word frequency", ylab = "French word frequency")
 ```
 
+```{r Viz Eng and Fre word frequency}
+# Estimate the mean and standard deviation of word frequency in English and French
+mean_tok_per_mo_eng <- mean(eng_fre_tokens_per_month_nonhomophones$tok_per_mo_eng)
+mean_tok_per_mo_fre <- mean(eng_fre_tokens_per_month_nonhomophones$tok_per_mo_fre)
+sd_tok_per_mo_eng <- sd(eng_fre_tokens_per_month_nonhomophones$tok_per_mo_eng)
+sd_tok_per_mo_fre <- sd(eng_fre_tokens_per_month_nonhomophones$tok_per_mo_fre)
+
+hist(eng_fre_tokens_per_month_nonhomophones$tok_per_mo_eng)
+hist(eng_fre_tokens_per_month_nonhomophones$tok_per_mo_fre)
+
+word_frequency_viz <- ggplot(data = eng_fre_tokens_per_month_nonhomophones, aes(x = tok_per_mo_eng, y = tok_per_mo_fre#, color = item
+                                                                                )) +
+  geom_smooth(method = "lm", se = TRUE) +
+  geom_point() +
+  # geom_text_repel(
+  #   data = filter(all_eng_fre_tokens_per_month, tok_per_mo_fre > 1000), 
+  #   aes(label = item),
+  #   position = "nudge" # Pushes the text slightly above the point
+  # ) +
+  ylim(0,2800) +
+  xlim(0,2800) +
+  labs(#title = "English Monolingual Word Learning",
+       x = "English word frequency (tokens per month)",
+       y = "French word frequency (tokens per month)",
+       ) #+
+  # theme(legend.position = "none") +
+  # geom_hline(yintercept = (mean_tok_per_mo_fre + (3*sd_tok_per_mo_fre))) +
+  # geom_vline(xintercept = (mean_tok_per_mo_eng + (3*sd_tok_per_mo_eng)))
+word_frequency_viz
+
+ggsave("figures/word_frequency_viz.png", plot = word_frequency_viz,
+       width = 17,
+       height = 15,
+       units = "cm")
+```
+
 ```{r Keep nouns only}
 # Remove non-nouns
 # 287 nouns
@@ -382,12 +423,13 @@ mono_eng_nouns_only_word_frequency <- mono_eng_nouns_only_word_frequency %>%
 # Visualize age*frequency interaction
 mono_eng_interactive_viz <- ggplot(data = mono_eng_nouns_only_word_frequency, aes(x = age, y = produces, color = frequency_bins)) +
   # geom_point() +
+  # geom_jitter(size = 0.4, height = 0.2) +
   geom_smooth(method = "glm",
     method.args = list(family = "binomial"),
     # se = FALSE,
     alpha = 0.3
     ) +
-  scale_color_bmj() +
+  scale_color_manual(values=frequency_colors) +
   ylim(NA,1) +
   labs(title = "English Monolingual Word Learning",
        x = "Age (months)",
@@ -405,12 +447,13 @@ load("data/mono_fre_nouns_only_cdi_data.RDS")
 # Visualize age*frequency interaction
 mono_fre_interactive_viz <- ggplot(data = mono_fre_nouns_only_cdi_data, aes(x = age, y = produces, color = frequency_bins)) +
   # geom_point() +
+  # geom_jitter(size = 0.4, height = 0.2) +
   geom_smooth(method = "glm",
     method.args = list(family = "binomial"),
     # se = FALSE,
     alpha = 0.3
     ) +
-  scale_color_bmj() +
+  scale_color_manual(values=frequency_colors) +
   ylim(NA,1) +
   labs(title = "French Monolingual Word Learning",
        x = "Age (months)",

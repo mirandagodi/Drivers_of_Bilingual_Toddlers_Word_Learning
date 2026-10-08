@@ -43,6 +43,11 @@ load("data/eng_cdi_homophones_df.RDS")
 load("data/fre_cdi_homophones_df.RDS")
 ```
 
+```{r Color palettes}
+frequency_colors <- c("#1A8AD9", "#199DAF", "#19B084", "#18C35A")
+exposure_colors <- c("#EDD93D", "#D8872A", "#C23417")
+```
+
 ## Get full BNW data
 The following chunks clean and merge the BNW CDI and LEQ data
 ```{r Participants with health issues}
@@ -700,12 +705,13 @@ load("data/biling_eng_noun_frequency.RDS")
 # Visualize age*frequency interaction
 concept_age_frequency_viz <- ggplot(data = biling_eng_noun_frequency, aes(x = age, y = concept_acquired, color = monoling_frequency_bins)) +
   # geom_point() +
+  # geom_jitter(size = 0.4, height = 0.2) +
   geom_smooth(method = "glm",
     method.args = list(family = "binomial"),
     # se = FALSE,
     alpha = 0.3
     ) +
-  scale_color_bmj() +
+  scale_color_manual(values=frequency_colors) +
   ylim(NA,1) +
   labs(#title = "Bilingual Concept Learning",
        x = "Age (months)",
@@ -717,12 +723,13 @@ concept_age_frequency_viz
 # Visualize age*exposure interaction
 concept_age_exposure_viz <- ggplot(data = biling_eng_noun_frequency, aes(x = age, y = concept_acquired, color = exposure_balance_round)) +
   # geom_point() +
+  # geom_jitter(size = 0.4, height = 0.2) +
   geom_smooth(method = "glm",
     method.args = list(family = "binomial"),
     # se = FALSE,
     alpha = 0.3
     ) +
-  scale_color_bmj() +
+  scale_color_manual(values=exposure_colors) +
   ylim(NA,1) +
   labs(#title = "Bilingual Concept Learning",
        x = "Age (months)",
@@ -738,6 +745,31 @@ biling_concept_interactive_plots <- ggarrange(concept_age_frequency_viz, concept
 biling_concept_interactive_plots
 
 ggsave("figures/biling_concept_interactive_plots.png", plot = biling_concept_interactive_plots,
+       width = 16,
+       height = 15,
+       units = "cm")
+```
+
+```{r Concept bilingual three-way visualization}
+concept_threeway_interaction_viz <- ggplot(data = biling_eng_noun_frequency, aes(x = age, y = concept_acquired, color = monoling_frequency_bins)) +
+  # geom_point() +
+  # geom_jitter(size = 0.4, height = 0.2) +
+  geom_smooth(method = "glm",
+    method.args = list(family = "binomial"),
+    # se = FALSE,
+    alpha = 0.3
+    ) +
+  scale_color_manual(values=frequency_colors) +
+  ylim(NA,1) +
+  facet_grid(rows = vars(exposure_balance_round)) +
+  labs(#title = "Bilingual Concept Learning",
+       x = "Age (months)",
+       y = "Probability of word production",
+       color = "Monthly concept \nfrequency")
+
+concept_threeway_interaction_viz
+
+ggsave("figures/biling_concept_threeway_interaction_plot.png", plot = concept_threeway_interaction_viz,
        width = 16,
        height = 15,
        units = "cm")
@@ -853,7 +885,7 @@ age_frequency_viz <- ggplot(data = biling_noun_frequency_long, aes(x = age, y = 
     # se = FALSE,
     alpha = 0.3
     ) +
-  scale_color_bmj() +
+  scale_color_manual(values=frequency_colors) +
   ylim(NA,1) +
   labs(#title = "Bilingual Word Learning",
        x = "Age (months)",
@@ -870,7 +902,7 @@ age_exposure_viz <- ggplot(data = biling_noun_frequency_long, aes(x = age, y = w
     # se = FALSE,
     alpha = 0.3
     ) +
-  scale_color_bmj() +
+  scale_color_manual(values=exposure_colors) +
   ylim(NA,1) +
   labs(#title = "Bilingual Word Learning",
        x = "Age (months)",
@@ -889,6 +921,31 @@ ggsave("figures/biling_word_interactive_plots.png", plot = biling_word_interacti
        height = 15,
        units = "cm")
 
+```
+
+```{r Word bilingual three-way visualization}
+word_threeway_interaction_viz <- ggplot(data = biling_noun_frequency_long, aes(x = age, y = word_acquired, color = monoling_frequency_bins)) +
+  # geom_point() +
+  # geom_jitter(size = 0.4, height = 0.2) +
+  geom_smooth(method = "glm",
+    method.args = list(family = "binomial"),
+    # se = FALSE,
+    alpha = 0.3
+    ) +
+  scale_color_manual(values=frequency_colors) +
+  ylim(NA,1) +
+  facet_grid(rows = vars(lang_exposure_round)) +
+  labs(#title = "Bilingual Concept Learning",
+       x = "Age (months)",
+       y = "Probability of word production",
+       color = "Monthly concept \nfrequency")
+
+word_threeway_interaction_viz
+
+ggsave("figures/biling_word_threeway_interaction_plot.png", plot = word_threeway_interaction_viz,
+       width = 16,
+       height = 15,
+       units = "cm")
 ```
 
 # Models with random slopes
