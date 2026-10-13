@@ -18,7 +18,8 @@ knitr::opts_chunk$set(echo = TRUE)
 # Load libraries
 library(tidyverse)
 # library(childes-db)
-# library(childesr)
+library(redivis)
+library(childesr)
 library(wordbankr)
 library(lme4)
 library(ggpubr)
@@ -46,7 +47,7 @@ frequency_colors <- c("#1A8AD9", "#199DAF", "#19B084", "#18C35A")
 ```
 
 Estimate the number of tokens French-learning children hear per month. Estimates were retrieved from Le Normand & Thai-Van (2022). Table 1 includes the number of children in each age group and the group mean of word tokens heard in a session, which were 20 minutes long
-```{r}
+```{r French input}
 # Estimate the weighted mean of tokens per session
 group_means <- c(127, 199, 256, 392, 414, 486, 494, 491, 475)
 group_sizes <- c(39, 32, 38, 36, 37, 34, 33, 35, 31)
@@ -60,6 +61,22 @@ mean_tokens_per_month <- round(mean_tokens_per_session * 3 * # Tokens per hour, 
                               digits = 0)
 ```
 The number of monthly tokens heard by French-acquiring children is not very different from the monthly tokens for English-acquiring children (438336). And given that our sample is North American, the English tokens will be used for French models.
+
+```{r English-French Bilingual CHILDES}
+# Get all transcripts in the English-French bilingual corpus (2 corpus)
+gnp_transcripts <- get_transcripts(corpus = c("GNP", "Watkins"))
+
+# Get tokens for the EN-FR bilingual corpus
+biling_corpus_tokens<- get_tokens(corpus = c("GNP", "Watkins"),
+                          role = "target_child",
+                          # target_child = "Adam",
+                          token = "*"
+                          )
+
+# Match corpus tokens to CDI nouns
+biling_corpus_nouns <- biling_corpus_tokens %>% 
+  filter(part_of_speech == "noun")
+```
 
 Retrieve French data from CHILDES
 ```{r Read CHILDES data}
