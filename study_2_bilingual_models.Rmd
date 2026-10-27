@@ -518,7 +518,7 @@ load("data/biling_eng_noun_frequency.RDS")
 # These models are based on the monolingual best fitting models: age*tokens per month
 
 bi_eng_age_times_biling_tokmo <- 
-  glmer(eng_acquired ~ -1 + age_centered * eng_biling_tok_per_month + (1 | english_item) + (1 | study_id), 
+  glmer(eng_acquired ~ -1 + age_centered * tok_per_mo_centered:eng_exposure_centered + (1 | english_item) + (1 | study_id), 
                            data = biling_eng_noun_frequency,
                            family = binomial,
                            nAGQ = 0) # This was done by Kachergis et al.
@@ -555,12 +555,18 @@ load("models/bi_eng_age_times_tokmo_times_exposure.RDS")
 
 bi_eng_biling_tokens_plus_exposure_comparison <-  anova(bi_eng_age_times_biling_tokmo, bi_eng_age_times_tokmo_plus_exposure) 
 bi_eng_biling_tokens_plus_exposure_comparison
+r2(bi_eng_age_times_biling_tokmo)
+r2(bi_eng_age_times_tokmo_plus_exposure)
 
 bi_eng_biling_tokens_full_interactive_comparison <- anova(bi_eng_age_times_biling_tokmo, bi_eng_age_times_tokmo_times_exposure)
 bi_eng_biling_tokens_full_interactive_comparison
+r2(bi_eng_age_times_biling_tokmo)
+r2(bi_eng_age_times_tokmo_times_exposure)
 
 bi_eng_plus_exposure_full_interactive_comparison <- anova(bi_eng_age_times_tokmo_plus_exposure, bi_eng_age_times_tokmo_times_exposure)
 bi_eng_plus_exposure_full_interactive_comparison
+r2(bi_eng_age_times_tokmo_plus_exposure)
+r2(bi_eng_age_times_tokmo_times_exposure)
 
 
 beep()
@@ -575,14 +581,15 @@ save(bi_eng_biling_tokens_plus_exposure_comparison, bi_eng_biling_tokens_full_in
 # model_performance(bi_eng_age_times_tokmo_times_exposure)
 summary(bi_eng_age_times_tokmo_times_exposure)
 summ(bi_eng_age_times_tokmo_times_exposure, digits = 3)
-report(bi_eng_age_times_tokmo_times_exposure, digits = 3)
+# report(bi_eng_age_times_tokmo_times_exposure, digits = 3)
+check_collinearity(bi_eng_age_times_tokmo_times_exposure)
 ```
 
 ```{r French bilingual interactive models}
 # These models are based on the monolingual best fitting models: age*tokens per month
 
 bi_fre_age_times_biling_tokmo <- 
-  glmer(fr_acquired ~ -1 + age_centered * fre_biling_tok_per_month + (1 | french_item) + (1 | study_id), 
+  glmer(fr_acquired ~ -1 + age_centered * tok_per_mo_centered:fre_exposure_centered + (1 | french_item) + (1 | study_id), 
                            data = biling_eng_noun_frequency,
                            family = binomial,
                            nAGQ = 0) # This was done by Kachergis et al.
@@ -617,12 +624,18 @@ load("models/bi_fre_age_times_tokmo_times_exposure.RDS")
 
 bi_fre_biling_tokens_plus_exposure_comparison <-  anova(bi_fre_age_times_biling_tokmo, bi_fre_age_times_tokmo_plus_exposure) 
 bi_fre_biling_tokens_plus_exposure_comparison
+r2(bi_fre_age_times_biling_tokmo)
+r2(bi_fre_age_times_tokmo_plus_exposure)
 
 bi_fre_biling_tokens_full_interactive_comparison <- anova(bi_fre_age_times_biling_tokmo, bi_fre_age_times_tokmo_times_exposure)
 bi_fre_biling_tokens_full_interactive_comparison
+r2(bi_fre_age_times_biling_tokmo)
+r2(bi_fre_age_times_tokmo_times_exposure)
 
 bi_fre_plus_exposure_full_interactive_comparison <- anova(bi_fre_age_times_tokmo_plus_exposure, bi_fre_age_times_tokmo_times_exposure)
 bi_fre_plus_exposure_full_interactive_comparison
+r2(bi_fre_age_times_tokmo_plus_exposure)
+r2(bi_fre_age_times_tokmo_times_exposure)
 
 beep()
 
@@ -637,6 +650,7 @@ save(bi_fre_biling_tokens_plus_exposure_comparison, bi_fre_biling_tokens_full_in
 summary(bi_fre_age_times_tokmo_times_exposure)
 summ(bi_fre_age_times_tokmo_times_exposure, digits = 3)
 report(bi_fre_age_times_tokmo_times_exposure, digits = 3)
+check_collinearity(bi_fre_age_times_tokmo_times_exposure)
 ```
 
 ```{r Concept bilingual interactive models}
@@ -679,12 +693,18 @@ load("models/bi_concept_age_times_tokmo_times_balance.RDS")
 
 bi_concept_tokens_plus_balance_comparison <-  anova(bi_concept_age_times_tokmo, bi_concept_age_times_tokmo_plus_balance) 
 bi_concept_tokens_plus_balance_comparison
+r2(bi_concept_age_times_tokmo)
+r2(bi_concept_age_times_tokmo_plus_balance)
 
 bi_concept_tokens_times_balance_comparison <- anova(bi_concept_age_times_tokmo, bi_concept_age_times_tokmo_times_balance)
 bi_concept_tokens_times_balance_comparison
+r2(bi_concept_age_times_tokmo)
+r2(bi_concept_age_times_tokmo_times_balance)
 
 bi_concept_full_interactive_comparison <- anova(bi_concept_age_times_tokmo_plus_balance, bi_concept_age_times_tokmo_times_balance)
 bi_concept_full_interactive_comparison
+r2(bi_concept_age_times_tokmo_plus_balance)
+r2(bi_concept_age_times_tokmo_times_balance)
 
 beep()
 
@@ -696,7 +716,8 @@ save(bi_concept_tokens_plus_balance_comparison, bi_concept_tokens_times_balance_
 ```{r Concept bilingual model report}
 summary(bi_concept_age_times_tokmo_times_balance)
 summ(bi_concept_age_times_tokmo_times_balance, digits = 3)
-report(bi_concept_age_times_tokmo_times_balance, digits = 3)
+# report(bi_concept_age_times_tokmo_times_balance, digits = 3)
+check_collinearity(bi_concept_age_times_tokmo_times_balance)
 ```
 
 ```{r Concept bilingual interactive model visualization}
@@ -817,7 +838,7 @@ load("data/biling_noun_frequency_long.RDS")
 # These models are based on the monolingual best fitting models: age*tokens per month
 
 bi_word_age_times_biling_tokmo <- 
-  glmer(word_acquired ~ -1 + age_centered * biling_tok_per_month + (1 | word) + (1 | study_id), 
+  glmer(word_acquired ~ -1 + age_centered * tok_per_mo_centered:lang_exposure_centered + (1 | word) + (1 | study_id), 
                            data = biling_noun_frequency_long,
                            family = binomial,
                            nAGQ = 0) # This was done by Kachergis et al.
@@ -852,12 +873,18 @@ load("models/bi_word_age_times_tokmo_times_exposure.RDS")
 
 bi_word_biling_tokens_plus_exposure_comparison <-  anova(bi_word_age_times_biling_tokmo, bi_word_age_times_tokmo_plus_exposure) 
 bi_word_biling_tokens_plus_exposure_comparison
+r2(bi_word_age_times_biling_tokmo)
+r2(bi_word_age_times_tokmo_plus_exposure)
 
 bi_word_biling_tokens_full_interactive_comparison <- anova(bi_word_age_times_biling_tokmo, bi_word_age_times_tokmo_times_exposure)
 bi_word_biling_tokens_full_interactive_comparison
+r2(bi_word_age_times_biling_tokmo)
+r2(bi_word_age_times_tokmo_times_exposure)
 
 bi_word_plus_exposure_full_interactive_comparison <- anova(bi_word_age_times_tokmo_plus_exposure, bi_word_age_times_tokmo_times_exposure)
 bi_word_plus_exposure_full_interactive_comparison
+r2(bi_word_age_times_tokmo_plus_exposure)
+r2(bi_word_age_times_tokmo_times_exposure)
 
 beep()
 
@@ -872,6 +899,7 @@ save(bi_word_biling_tokens_plus_exposure_comparison, bi_word_biling_tokens_full_
 summary(bi_word_age_times_tokmo_times_exposure)
 summ(bi_word_age_times_tokmo_times_exposure, digits = 3)
 report(bi_word_age_times_tokmo_times_exposure, digits = 3)
+check_collinearity(bi_word_age_times_tokmo_times_exposure)
 ```
 
 ```{r Word bilingual interactive model visualization}

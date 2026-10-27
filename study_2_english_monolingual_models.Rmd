@@ -204,21 +204,27 @@ save(m_eng_interactive_age_tokmo_nouns_only, file = "models/mono_eng_interactive
 
 ```{r Noun model comparison}
 # # Load models
-# load("models/mono_eng_lifetime_tokens_nouns_only.RDS")
-# load("models/mono_eng_additive_age_tokmo_nouns_only.RDS")
+load("models/mono_eng_lifetime_tokens_nouns_only.RDS")
+load("models/mono_eng_additive_age_tokmo_nouns_only.RDS")
 load("models/mono_eng_interactive_age_tokmo_nouns_only.RDS")
 
 # Compare lifetime tokens vs additive age+tokens per months models
 eng_lifetok_additive_comparison <-  anova(m_eng_lifetime_tokens_nouns_only, m_eng_additive_age_tokmo_nouns_only)
 eng_lifetok_additive_comparison
+r2(m_eng_lifetime_tokens_nouns_only)
+r2(m_eng_additive_age_tokmo_nouns_only)
 
 # Compare lifetime tokens vs interactive age*token per month models
 eng_lifetok_interactive_comparison <- anova(m_eng_lifetime_tokens_nouns_only, m_eng_interactive_age_tokmo_nouns_only)
 eng_lifetok_interactive_comparison
+r2(m_eng_lifetime_tokens_nouns_only)
+r2(m_eng_interactive_age_tokmo_nouns_only)
 
 # Compare additive age+tokens per months vs interactive age*token per month models
 eng_additive_interactive_comparison <- anova(m_eng_additive_age_tokmo_nouns_only, m_eng_interactive_age_tokmo_nouns_only)
 eng_additive_interactive_comparison
+r2(m_eng_additive_age_tokmo_nouns_only)
+r2(m_eng_interactive_age_tokmo_nouns_only)
 
 beep()
 
@@ -256,6 +262,7 @@ summ(m_eng_interactive_age_tokmo_nouns_only, digits = 3)
 tbl_regression(m_eng_interactive_age_tokmo_nouns_only)
 r2(m_eng_interactive_age_tokmo_nouns_only)
 # report(m_eng_interactive_age_tokmo_nouns_only, digits = 3)
+check_collinearity(m_eng_interactive_age_tokmo_nouns_only)
 ```
 
 ```{r Visualize monolingual English interactive model}
