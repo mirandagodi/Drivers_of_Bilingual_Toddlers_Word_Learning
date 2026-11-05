@@ -976,6 +976,106 @@ ggsave("figures/biling_word_threeway_interaction_plot.png", plot = word_threeway
        units = "cm")
 ```
 
+# Models with demographics
+
+```{r Clean demographics}
+# ENGLISH
+Eng_df_demographics <- Eng_df_keepers %>%
+  # Remove unnecessary columns
+  select(-c(TRUE_months, eng_est_total_produced, age, birth_weight_lb:mother_yob, secondary_caregiver:father_education, child_hispanic_latino, caregiver_info:worried_boolean, eng_total_produced, baa_baa:then)) %>% 
+  # Remove rows of uncompleted CDIs
+  filter(completed == TRUE) %>%
+  # Check that each baby has always the same answer
+  group_by(study_id) %>% 
+  mutate(check_sex = case_when(sex != lead(sex) ~ "check"),
+         # check_income = case_when(annual_income != lead(annual_income) ~ "check"), # Income can vary across time
+         check_ethnicity = case_when(child_ethnicity != lead(child_ethnicity) ~ "check")) %>% 
+  ungroup() %>% 
+  mutate(sex = case_when(study_id == "S037" & sex == "Female" ~ "Male", # Fix row with typo (parents said their child is female only once)
+                         TRUE ~ sex)) %>% 
+  select(-c(check_sex, check_ethnicity))
+
+# FRENCH
+Fre_df_demographics <- Fr_df_keepers %>% 
+  # Remove unnecessary columns
+  select(-c(TRUE_months, fr_est_total_produced, age, birth_weight_lb:mother_yob, secondary_caregiver:father_education, child_hispanic_latino, caregiver_info:worried_boolean, fr_total_produced, aie:si)) %>% 
+  # Remove rows of uncompleted CDIs
+  filter(completed == TRUE) %>%
+  # Check that each baby has always the same answer
+  group_by(study_id) %>% 
+  mutate(check_sex = case_when(sex != lead(sex) ~ "check"),
+         # check_income = case_when(annual_income != lead(annual_income) ~ "check"), # Income can vary across time
+         check_ethnicity = case_when(child_ethnicity != lead(child_ethnicity) ~ "check")) %>% 
+  ungroup() %>% 
+  select(-c(check_sex, check_ethnicity))
+
+# Merge datasets
+demographics_df <- full_join(Eng_df_demographics, Fre_df_demographics) %>% 
+  # Convert income ranges into the range average. "Prefer not to disclose" will be considered NA.
+  mutate(income_range_average = case_when(annual_income == "25000-50000" ~ (25000+50000)/2,
+                                     annual_income == "50000-75000" ~ (50000+75000)/2,
+                                     annual_income == "75000-100000" ~ (75000+100000)/2,
+                                     annual_income == "100000-125000" ~ (100000+125000)/2,
+                                     annual_income == "125000-150000" ~ (125000+150000)/2,
+                                     annual_income == "150000-175000" ~ (150000+175000)/2,
+                                     annual_income == "175000-200000" ~ (175000+200000)/2,
+                                     annual_income == ">200000" ~ (200000+225000)/2),
+         birth_order = as.factor(birth_order),
+    birth_order_categorical = case_when(birth_order == "1" ~ "first_born",
+                                        birth_order == "0" ~ NA,
+                                        TRUE ~ "later_born"))
+
+# Merge with item-level data
+load("data/biling_eng_noun_frequency.RDS")
+load("data/biling_noun_frequency_long.RDS")
+
+biling_item_demographic <- full_join(demographics_df, biling_eng_noun_frequency)
+biling_item_long_demographic <- full_join(demographics_df, biling_noun_frequency_long)
+```
+
+```{r Best fit models with demographics}
+# English
+bi_eng_demo <- 
+  glmer(eng_acquired ~ -1 + sex + birth_order + mother_education + child_ethnicity + income_range_average +
+          age_centered * tok_per_mo_centered * eng_exposure_centered + (1 | english_item) + (1 | study_id), 
+                           data = biling_item_demographic,
+                           family = binomial,
+                           nAGQ = 0) 
+beep()
+r2(bi_eng_demo)
+
+# French
+bi_fre_demo <- 
+  glmer(eng_acquired ~ -1 + sex + birth_order + mother_education + child_ethnicity + income_range_average +
+          age_centered * tok_per_mo_centered * fre_exposure_centered + (1 | french_item) + (1 | study_id), 
+                           data = biling_item_demographic,
+                           family = binomial,
+                           nAGQ = 0) 
+beep()
+r2(bi_fre_demo)
+
+# Word
+bi_word_demo <- 
+  glmer(word_acquired ~ -1 + sex + birth_order + mother_education + child_ethnicity + income_range_average +
+          age_centered * tok_per_mo_centered * lang_exposure_centered + (1 | word) + (1 | study_id), 
+                           data = biling_item_long_demographic,
+                           family = binomial,
+                           nAGQ = 0) 
+beep()
+r2(bi_word_demo)
+
+# Concept
+bi_concept_demo <- 
+  glmer(concept_acquired ~ -1 + sex + birth_order + mother_education + child_ethnicity + income_range_average +
+          age_centered * tok_per_mo_centered * exposure_balance_centered + (1 | item) + (1 | study_id), 
+                           data = biling_item_demographic,
+                           family = binomial,
+                           nAGQ = 0) 
+beep()
+r2(bi_concept_demo)
+```
+
+
 # Models with random slopes
 
 ```{r English bilingual interactive models}
